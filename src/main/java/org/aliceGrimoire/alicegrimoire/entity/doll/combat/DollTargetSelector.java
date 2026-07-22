@@ -23,7 +23,29 @@ public class DollTargetSelector extends TargetGoal {
         if (doll.getTarget() != null && doll.getTarget().isAlive()) {
             return false;
         }
-        
+
+        // 如果人偶有指定的目标 ID，直接检查该目标
+        int assignedId = doll.getAssignedTargetId();
+        if (assignedId != -1) {
+            Entity target = doll.level().getEntity(assignedId);
+            if (target instanceof LivingEntity living && living.isAlive() && doll.canAttack(living)) {
+                // 额外过滤同主人
+                if (target instanceof DollEntity otherDoll) {
+                    LivingEntity otherOwner = otherDoll.getOwner();
+                    LivingEntity owner = doll.getOwner();
+                    if (otherOwner != null && owner != null && otherOwner.equals(owner)) {
+                        return false;
+                    }
+                }
+                this.targetMob = living;
+                return true;
+            } else {
+                // 指定目标无效，返回 false，不切换
+                return false;
+            }
+        }
+
+        // 如果没有指定目标，则从全局标记中选择（为兼容保留，但实际不会走到这里）
         if (!doll.isEnraged()) return false;
         LivingEntity owner = doll.getOwner();
         if (!(owner instanceof Player player)) return false;

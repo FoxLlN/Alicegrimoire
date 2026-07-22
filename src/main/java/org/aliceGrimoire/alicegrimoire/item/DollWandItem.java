@@ -97,6 +97,7 @@ public class DollWandItem extends SwordItem {
                     // 激怒这个人偶
                     selectedDoll.setEnraged(true);
                     selectedDoll.setTarget(target);
+                    selectedDoll.setAssignedTargetId(target.getId()); 
                     
                     // 记录激怒时间（用于发光计时）
                     selectedDoll.setEnrageTime(level.getGameTime());

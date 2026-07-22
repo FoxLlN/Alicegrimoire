@@ -36,13 +36,13 @@ public class DollStateManager {
      * 每帧调用，执行状态转换和碰撞箱控制。
      */
     public void tick() {
-         // 添加日志
-        LOGGER.info("[DollState] Current State: " + currentState + 
-                        ", isEnraged: " + doll.isEnraged() + 
-                        ", hasTarget: " + (doll.getTarget() != null) +
-                        ", isTethered: " + doll.isTethered() +
-                        ", isPlayerMoving: " + doll.isPlayerActivelyMoving());
-                        
+        // 添加日志
+        // LOGGER.info("[DollState] Current State: " + currentState + 
+        //                 ", isEnraged: " + doll.isEnraged() + 
+        //                 ", hasTarget: " + (doll.getTarget() != null) +
+        //                 ", isTethered: " + doll.isTethered() +
+        //                 ", isPlayerMoving: " + doll.isPlayerActivelyMoving());
+                    
         // 1. 获取基础条件
         boolean isEnraged = doll.isEnraged();
         boolean hasValidTarget = doll.getTarget() != null && doll.getTarget().isAlive();

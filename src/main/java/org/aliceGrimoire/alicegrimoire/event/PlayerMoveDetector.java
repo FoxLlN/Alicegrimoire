@@ -100,6 +100,13 @@ public class PlayerMoveDetector {
     }
 
     /**
+     * 获取玩家的移动状态
+     */
+    public static boolean getPlayerMoving(UUID playerId) {
+        return playerMovingCache.getOrDefault(playerId, false);
+    }
+
+    /**
      * 获取玩家最近的实际移动速度（格/tick）
      * 供 DollMovementHandler 调用
      */

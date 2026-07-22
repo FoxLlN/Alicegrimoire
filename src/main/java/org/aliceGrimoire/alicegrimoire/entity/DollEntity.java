@@ -32,6 +32,7 @@ import org.aliceGrimoire.alicegrimoire.entity.doll.combat.DollTargetSelector;
 import org.aliceGrimoire.alicegrimoire.entity.doll.movement.DollMoveControl;
 import org.aliceGrimoire.alicegrimoire.entity.doll.movement.DollMovementHandler;
 import org.aliceGrimoire.alicegrimoire.entity.doll.util.DollCollisionHelper;
+import org.aliceGrimoire.alicegrimoire.event.PlayerMoveDetector;
 import org.aliceGrimoire.alicegrimoire.registry.ModAttachments;
 import org.jetbrains.annotations.Nullable;
 
@@ -45,6 +46,8 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.List;
+
 
 public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntity, RangedAttackMob {
     
@@ -52,6 +55,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
 
     private int shieldDisableTicks = 0;
     private boolean isPlayerMoving = false;
+    private int assignedTargetId = -1;
 
     // 返回模式（人偶哨）
     private boolean isReturning = false;
@@ -121,6 +125,14 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                 this.setTarget(null);
             }
 
+            // 如果激怒但指定目标无效，则解除激怒
+            if (this.isEnraged() && assignedTargetId != -1) {
+                Entity target = this.level().getEntity(assignedTargetId);
+                if (!(target instanceof LivingEntity) || !target.isAlive()) {
+                    this.setEnraged(false);
+                }
+            }
+
             // 3. 状态机更新（决定碰撞箱、状态切换）
             stateManager.tick();
 
@@ -139,8 +151,55 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                 }
             }
         }
+
+        // 7. 人偶互相排斥
+        if (!this.level().isClientSide && this.noPhysics) {
+            applyRepulsion();
+        }
     }
 
+    /**
+     * 应用人偶之间的排斥力
+     */
+    private void applyRepulsion() {
+        List<DollEntity> nearby = this.level().getEntitiesOfClass(
+            DollEntity.class,
+            this.getBoundingBox().inflate(1.5),
+            other -> other != this && other.noPhysics
+        );
+        
+        Vec3 totalRepel = Vec3.ZERO;
+        for (DollEntity other : nearby) {
+            Vec3 delta = this.position().subtract(other.position());
+            double dist = delta.length();
+            if (dist < 0.8 && dist > 0.01) {
+                double strength = 0.2 / (dist + 0.1);
+                Vec3 repel = delta.normalize().scale(strength);
+                totalRepel = totalRepel.add(repel);
+                // 同时给对方施加反向力
+                other.applyRepulsionFrom(this, repel);
+            }
+        }
+        
+        if (totalRepel.lengthSqr() > 0) {
+            // 直接修改位置（而不是速度），确保立即生效
+            Vec3 newPos = this.position().add(totalRepel);
+            this.moveTo(newPos.x, newPos.y, newPos.z);
+            // 同时也设置速度，保持平滑
+            this.setDeltaMovement(this.getDeltaMovement().add(totalRepel));
+        }
+    }
+
+    /**
+     * 从其他人偶接收排斥力
+     */
+    public void applyRepulsionFrom(DollEntity source, Vec3 repel) {
+        if (this.noPhysics) {
+            Vec3 newPos = this.position().subtract(repel);
+            this.moveTo(newPos.x, newPos.y, newPos.z);
+            this.setDeltaMovement(this.getDeltaMovement().subtract(repel));
+        }
+    }
     @Override
     public boolean isEffectiveAi() {
         boolean result = super.isEffectiveAi();
@@ -150,7 +209,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
     // ========== 目标选择（注册Goal） ==========
     @Override
     protected void registerGoals() {
-        LOGGER.info("[DollEntity] registerGoals() called!");
+        // LOGGER.info("[DollEntity] registerGoals() called!");
         this.goalSelector.addGoal(1, new DollStateGoal());
         this.goalSelector.addGoal(2, new DollMoveGoal());
         this.goalSelector.addGoal(3, new DollCombatGoal());
@@ -158,6 +217,9 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         this.targetSelector.addGoal(1, new DollTargetSelector(this));
         this.targetSelector.addGoal(2, new HurtByTargetGoal(this).setAlertOthers());
     }
+
+    public int getAssignedTargetId() { return assignedTargetId; }
+    public void setAssignedTargetId(int id) { this.assignedTargetId = id; }
 
     // ========== 简单的内部 Goal 类（委托给管理器） ==========
     private class DollStateGoal extends Goal {
@@ -221,6 +283,10 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
 
     public void setOwnerUUID(@Nullable UUID uuid) {
         this.entityData.set(OWNER_UUID, Optional.ofNullable(uuid));
+        if (uuid != null) {
+            // 立即同步移动状态
+            this.setPlayerMoving(PlayerMoveDetector.getPlayerMoving(uuid));
+        }
     }
 
     @Nullable
@@ -245,6 +311,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
             // 清除目标，但状态机会在 tick 中处理
             this.setTarget(null);
             this.enrageTime = 0; // 重置激怒时间
+            this.assignedTargetId = -1; // 重置指定目标ID
         }
         // 刷新属性（例如近卫的持盾状态）
     }

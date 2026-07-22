@@ -16,6 +16,7 @@ import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.world.item.component.CustomData;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
+import org.aliceGrimoire.alicegrimoire.event.PlayerMoveDetector;
 import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
 import org.aliceGrimoire.alicegrimoire.registry.ModEntities;
 import org.aliceGrimoire.alicegrimoire.client.DollModel;
@@ -91,6 +92,8 @@ public class DollItem extends BlockItem implements GeoItem {
                     doll.setDollType(itemstack.getOrDefault(ModDataComponents.DOLL_TYPE, DollType.STANDARD));
                     
                     doll.setOwnerUUID(player.getUUID());
+                    // 立即获取移动状态
+                    doll.setPlayerMoving(PlayerMoveDetector.getPlayerMoving(player.getUUID()));
                     doll.moveTo(player.getX(), player.getEyeY(), player.getZ(), player.getYRot(), player.getXRot());
                     
                     Vec3 look = player.getLookAngle();
