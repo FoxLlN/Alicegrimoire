@@ -78,10 +78,18 @@ public class DollRenderer extends GeoEntityRenderer<DollEntity> {
 
         // 指令 9/10：高亮颜色逻辑
         int r = 255, g = 255, b = 255; // 默认白色
+
         if (entity.isInsideBlock()) {
-            r = 255; g = 0; b = 0; // 红色
+            r = 255; g = 0; b = 0; // 红色（卡在方块内）
         } else if (entity.getObstructedTicks() > 0) {
-            r = 255; g = 255; b = 0; // 黄色
+            // 根据阻塞程度渐变：黄色 -> 橙色 -> 红色
+            int ticks = entity.getObstructedTicks();
+            float progress = Math.min(ticks / 60.0f, 1.0f); // 60 tick = 3秒
+            r = 255;
+            g = (int)(255 * (1 - progress));
+            b = (int)(255 * (1 - progress * 0.8f));
+        } else {
+            r = 255; g = 255; b = 255; // 白色（畅通）
         }
 
         for(int i = 0; i <= 24; ++i) {

@@ -12,7 +12,7 @@ public class ModEntities {
     public static final DeferredRegister<EntityType<?>> ENTITIES = DeferredRegister.create(Registries.ENTITY_TYPE, Alicegrimoire.MODID);
 
     public static final DeferredHolder<EntityType<?>, EntityType<DollEntity>> DOLL = ENTITIES.register("doll", 
-        () -> EntityType.Builder.of(DollEntity::new, MobCategory.CREATURE)
+        () -> EntityType.Builder.<DollEntity>of(DollEntity::new, MobCategory.CREATURE)
             .sized(0.6f, 2.0f)
             .build("doll"));
 }

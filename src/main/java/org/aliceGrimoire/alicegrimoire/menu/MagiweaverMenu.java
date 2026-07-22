@@ -10,7 +10,7 @@ import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import org.aliceGrimoire.alicegrimoire.entity.DollType;
+import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
 import org.aliceGrimoire.alicegrimoire.item.DollItem;
 import org.aliceGrimoire.alicegrimoire.item.DollStringItem;
 import org.aliceGrimoire.alicegrimoire.item.DollWandItem;

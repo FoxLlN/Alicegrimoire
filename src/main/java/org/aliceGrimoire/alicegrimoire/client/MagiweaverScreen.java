@@ -7,7 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import org.aliceGrimoire.alicegrimoire.Alicegrimoire;
-import org.aliceGrimoire.alicegrimoire.entity.DollType;
+import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
 import org.aliceGrimoire.alicegrimoire.item.DollItem;
 import org.aliceGrimoire.alicegrimoire.menu.MagiweaverMenu;
 import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;

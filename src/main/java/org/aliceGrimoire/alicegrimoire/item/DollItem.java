@@ -15,7 +15,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.world.item.component.CustomData;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
-import org.aliceGrimoire.alicegrimoire.entity.DollType;
+import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
 import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
 import org.aliceGrimoire.alicegrimoire.registry.ModEntities;
 import org.aliceGrimoire.alicegrimoire.client.DollModel;

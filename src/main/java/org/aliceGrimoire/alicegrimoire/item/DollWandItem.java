@@ -14,6 +14,9 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.attachment.AttachmentType;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.registry.ModAttachments;
+
+import com.mojang.logging.LogUtils;
+
 import net.minecraft.network.chat.Component;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -21,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 
 public class DollWandItem extends SwordItem {
+    private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
     public DollWandItem(Tier tier, Properties properties) {
         super(tier, properties);
     }
@@ -74,6 +78,7 @@ public class DollWandItem extends SwordItem {
                 DollEntity selectedDoll = selectDoll(dolls, target);
                 
                 if (selectedDoll != null) {
+                    // LOGGER.info("[Wand] Selected doll: " + selectedDoll);
                     // 检查是否卡墙（优先选择没卡墙的）
                     if (selectedDoll.isInsideBlock()) {
                         // 如果选中的卡墙了，尝试找下一个
@@ -133,6 +138,8 @@ public class DollWandItem extends SwordItem {
         
         // 2. 过滤条件：未激怒 + 未卡墙（除非允许）+ 未被标记为"无法使用"
         for (DollEntity doll : dolls) {
+            // LOGGER.info("[Wand] Checking doll: " + doll + ", enraged: " + doll.isEnraged() + 
+            //                ", insideBlock: " + doll.isInsideBlock() + ", canBeEnraged: " + doll.canBeEnraged());
             if (!doll.isEnraged() && doll.isAlive()) {
                 if (!allowStuck && doll.isInsideBlock()) {
                     continue; // 跳过卡墙的

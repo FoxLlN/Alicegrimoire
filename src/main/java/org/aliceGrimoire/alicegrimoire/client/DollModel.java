@@ -7,7 +7,7 @@ import net.minecraft.world.item.component.CustomData;
 import org.aliceGrimoire.alicegrimoire.Alicegrimoire;
 import org.aliceGrimoire.alicegrimoire.block.DollBlockEntity;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
-import org.aliceGrimoire.alicegrimoire.entity.DollType;
+import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
 import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
 import software.bernie.geckolib.animatable.GeoAnimatable;
 import software.bernie.geckolib.model.GeoModel;

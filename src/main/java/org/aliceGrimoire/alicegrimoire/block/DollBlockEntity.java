@@ -9,7 +9,7 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import org.aliceGrimoire.alicegrimoire.entity.DollType;
+import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
 import org.aliceGrimoire.alicegrimoire.registry.ModBlockEntities;
 import software.bernie.geckolib.animatable.GeoBlockEntity;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
