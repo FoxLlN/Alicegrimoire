@@ -7,7 +7,7 @@ import net.minecraft.world.item.component.CustomData;
 import org.aliceGrimoire.alicegrimoire.Alicegrimoire;
 import org.aliceGrimoire.alicegrimoire.block.DollBlockEntity;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
-import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
+import org.aliceGrimoire.alicegrimoire.entity.doll.data.DollJobType;
 import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
 import software.bernie.geckolib.animatable.GeoAnimatable;
 import software.bernie.geckolib.model.GeoModel;
@@ -31,15 +31,15 @@ public class DollModel<T extends GeoAnimatable> extends GeoModel<T> {
         return ResourceLocation.fromNamespaceAndPath(Alicegrimoire.MODID, "animations/doll.animation.json");
     }
 
-    private DollType getDollType(T animatable) {
+    private DollJobType getDollType(T animatable) {
         if (animatable instanceof DollEntity doll) {
-            return doll.getDollType();
+            return doll.getJobType();
         }
         if (animatable instanceof DollBlockEntity be) {
             return be.getDollType();
         }
         // 对于物品，GeckoLib 4.x 会将 ItemStack 关联到渲染上下文中
         // 这里暂时返回标准类型，稍后我们会处理物品的特殊逻辑
-        return DollType.STANDARD;
+        return DollJobType.STANDARD;
     }
 }

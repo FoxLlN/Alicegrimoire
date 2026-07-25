@@ -6,39 +6,45 @@ import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.combat.ICombatStrategy;
 
 /**
- * 近卫策略：持盾保护玩家，面向最近标记目标，保持在玩家 4 格内。
- * 攻击方式：盾牌反击（由 hurt 事件驱动），AI 不主动攻击。
+ * 守御策略：持盾保护玩家
+ * - 始终在玩家 4 格半径内游荡
+ * - 举盾面对目标
+ * - 玩家受伤时瞬移至攻击者与玩家之间
+ * - 受攻击后破盾 5 秒（斧头攻击额外延长）
  */
-public class GuardStrategy implements ICombatStrategy {
-
+public class DefenderStrategy implements ICombatStrategy {
+    private static final double GUARD_RADIUS = 4.0;
+    private static final int SHIELD_DISABLE_TIME = 100; // 5 秒破盾
+    
     @Override
     public void tick(DollEntity doll, LivingEntity target, LivingEntity owner) {
         if (owner == null) return;
 
-        // 1. 面向目标（仅当目标在 16 格内且可见）
+        // 1. 面向最近的目标（如果存在）
         if (target != null && doll.distanceTo(target) <= 16.0 && doll.getSensing().hasLineOfSight(target)) {
             doll.getLookControl().setLookAt(target, 30.0F, 30.0F);
         }
 
         // 2. 保持在玩家 4 格半径内
         double distToOwner = doll.distanceTo(owner);
-        if (distToOwner > 4.0) {
+        if (distToOwner > GUARD_RADIUS) {
+            // 靠近玩家
             Vec3 dir = owner.position().subtract(doll.position()).normalize();
-            Vec3 targetPos = owner.position().subtract(dir.scale(2.0)); // 停在玩家身前 2 格
+            Vec3 targetPos = owner.position().subtract(dir.scale(Math.min(2.0, distToOwner - GUARD_RADIUS)));
             doll.getMoveControl().setWantedPosition(targetPos.x, owner.getY() + 1.5, targetPos.z, 1.0);
         } else if (target != null) {
-            // 如果已经在玩家身边，可向目标方向稍微调整
-            Vec3 dir = target.position().subtract(doll.position()).normalize();
-            Vec3 targetPos = doll.position().add(dir.scale(0.5));
+            // 在玩家身边时，调整到玩家与目标之间（面朝目标）
+            Vec3 dir = target.position().subtract(owner.position()).normalize();
+            Vec3 targetPos = owner.position().add(dir.scale(1.5));
             doll.getMoveControl().setWantedPosition(targetPos.x, owner.getY() + 1.5, targetPos.z, 0.8);
         }
 
-        // 3. 更新盾牌禁用计时（由 hurt 事件设置）
-        // 在 DollEntity 中通过 shieldDisableTicks 控制 isBlocking，这里无需额外操作
+        // 3. 始终举盾（由 DollEntity.isBlocking() 控制）
+        // 状态由 DollEntity 中的 shieldDisableTicks 控制
     }
 
     @Override
     public boolean isAttacking() {
-        return false; // 近卫不主动攻击，只有反击
+        return false; // 守御不主动攻击
     }
 }

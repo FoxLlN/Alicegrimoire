@@ -23,6 +23,7 @@ public class DollStateManager {
     private DollState currentState = DollState.IDLE;
     private int recoveryTicks = 0;          // 冷却剩余 tick 数
     private int obstructedTicks = 0;        // 拴绳被阻挡累计时间
+    private boolean isTickRunning = false;  // 防止递归调用 tick() 导致无限循环
 
     public DollStateManager(DollEntity doll) {
         this.doll = doll;
@@ -37,12 +38,24 @@ public class DollStateManager {
      */
     public void tick() {
         // 添加日志
-        // LOGGER.info("[DollState] Current State: " + currentState + 
+        // LOGGER.info("[人偶状态机] 当前状态: " + currentState + 
         //                 ", isEnraged: " + doll.isEnraged() + 
         //                 ", hasTarget: " + (doll.getTarget() != null) +
         //                 ", isTethered: " + doll.isTethered() +
         //                 ", isPlayerMoving: " + doll.isPlayerActivelyMoving());
-                    
+             
+        if (isTickRunning) {
+            return; // 防止递归
+        }
+        isTickRunning = true;  
+        try {
+            updateState();
+        } finally {
+            isTickRunning = false;
+        }
+    }
+
+    public void updateState() {
         // 1. 获取基础条件
         boolean isEnraged = doll.isEnraged();
         boolean hasValidTarget = doll.getTarget() != null && doll.getTarget().isAlive();
@@ -83,6 +96,7 @@ public class DollStateManager {
             case ENGAGING:
                 // 如果失去激怒或目标死亡 -> 进入冷却恢复
                 if (!isEnraged || !hasValidTarget) {
+                    doll.setEnraged(false); // 清除激怒和指定目标
                     setState(DollState.RECOVERING);
                     recoveryTicks = 60;   // 3秒冷却
                 }
@@ -94,6 +108,12 @@ public class DollStateManager {
                 break;
 
             case RECOVERING:
+                // 如果冷却中但再次被激怒，立即中断冷却进入战斗
+                if (isEnraged && hasValidTarget) {
+                    setState(DollState.ENGAGING);
+                    recoveryTicks = 0;
+                    break;
+                }
                 // 冷却倒计时
                 if (recoveryTicks > 0) {
                     recoveryTicks--;

@@ -15,7 +15,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.world.item.component.CustomData;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
-import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
+import org.aliceGrimoire.alicegrimoire.entity.doll.data.DollJobType;
 import org.aliceGrimoire.alicegrimoire.event.PlayerMoveDetector;
 import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
 import org.aliceGrimoire.alicegrimoire.registry.ModEntities;
@@ -68,7 +68,8 @@ public class DollItem extends BlockItem implements GeoItem {
                 // Set type to block entity
                 BlockEntity be = context.getLevel().getBlockEntity(context.getClickedPos());
                 if (be instanceof org.aliceGrimoire.alicegrimoire.block.DollBlockEntity dollBe) {
-                    dollBe.setDollType(context.getItemInHand().getOrDefault(ModDataComponents.DOLL_TYPE, DollType.STANDARD));
+                    DollJobType type = context.getItemInHand().getOrDefault(ModDataComponents.DOLL_TYPE.get(), DollJobType.STANDARD);
+                    dollBe.setDollType(type);
                 }
             }
             return result;
@@ -89,8 +90,9 @@ public class DollItem extends BlockItem implements GeoItem {
                     }
                     
                     // Set type from component
-                    doll.setDollType(itemstack.getOrDefault(ModDataComponents.DOLL_TYPE, DollType.STANDARD));
-                    
+                    DollJobType type = itemstack.getOrDefault(ModDataComponents.DOLL_TYPE.get(), DollJobType.STANDARD);
+                    doll.setJobType(type);
+
                     doll.setOwnerUUID(player.getUUID());
                     // 立即获取移动状态
                     doll.setPlayerMoving(PlayerMoveDetector.getPlayerMoving(player.getUUID()));

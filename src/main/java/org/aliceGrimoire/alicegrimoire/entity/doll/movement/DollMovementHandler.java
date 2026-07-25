@@ -2,7 +2,6 @@ package org.aliceGrimoire.alicegrimoire.entity.doll.movement;
 
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.entity.ai.control.MoveControl;
 import net.minecraft.world.phys.Vec3;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.state.DollState;
@@ -55,14 +54,17 @@ public class DollMovementHandler {
                     Vec3 followPos = calculateFollowPosition(owner);
                     double speed = getFollowSpeed(owner);
                     setWantedPosition(followPos, speed);
+
+                    // 🎯 面向玩家
+                    //doll.getLookControl().setLookAt(owner, 30.0F, 30.0F);
+                    // 同步身体旋转，避免头身分离
+                    //doll.yBodyRot = doll.getYRot();
                 }
                 break;
 
             case ENGAGING:
             case RECOVERING:
-                // 战斗和恢复期间，移动由战斗策略或状态机直接控制，此处不干预
-                // 但为了安全，可以禁止 MoveControl 的自动移动
-                //doll.getMoveControl().setWantedPosition(doll.getX(), doll.getY(), doll.getZ(), 0.0);
+                // 战斗和恢复期间，移动由战斗策略控制
                 break;
         }
     }
@@ -106,7 +108,6 @@ public class DollMovementHandler {
      * 设置移动目标并应用速度
      */
     private void setWantedPosition(Vec3 target, double speed) {
-        // LOGGER.info("[Movement] Set wanted: " + target + ", speed: " + speed);
         this.wantedPosition = target;
         this.speedModifier = speed;
         doll.getMoveControl().setWantedPosition(
@@ -114,60 +115,40 @@ public class DollMovementHandler {
         );
     }
 
-    /**
-     * 游荡速度（低速档）
-     */
+    // ========== 速度方法（从 DollData 读取） ==========
+
     private double getWanderSpeed() {
-        return 0.1; // 等同于僵尸的移动速度
+        return doll.getDollData().getWanderSpeed();
     }
 
-    /**
-     * 跟随速度（中速档）
-     */
     private double getFollowSpeed(LivingEntity owner) {
-        // 方法1：从 PlayerMoveDetector 获取实际速度
-        double playerSpeed = PlayerMoveDetector.getPlayerSpeed(owner.getUUID());
+        double multiplier = doll.getDollData().getFollowSpeedMultiplier();
         
-        // 保底：如果缓存为空，尝试使用 getDeltaMovement()
+        double playerSpeed = PlayerMoveDetector.getPlayerSpeed(owner.getUUID());
         if (playerSpeed <= 0.01) {
             Vec3 vel = owner.getDeltaMovement();
             playerSpeed = vel.length();
         }
-        
-        // 最后保底：使用基础属性
         if (playerSpeed <= 0.01) {
             playerSpeed = owner.getAttributeValue(Attributes.MOVEMENT_SPEED) * 2.2;
         }
         
-        // 距离自适应倍率（1.0 ~ 2.0）
         double dx = doll.getX() - owner.getX();
         double dz = doll.getZ() - owner.getZ();
         double dist = Math.sqrt(dx*dx + dz*dz);
+        double factor = (dist <= 2.0) ? 1.0 : 1.0 + Math.min((dist - 2.0) / 8.0, 1.0);
         
-        double factor;
-        if (dist <= 2.0) {
-            factor = 1.0;
-        } else {
-            factor = 1.0 + Math.min((dist - 2.0) / 8.0, 1.0);
-        }
-        
-        double followSpeed = playerSpeed * factor;
-        followSpeed = Math.max(playerSpeed, followSpeed);
-        
-        // LOGGER.info("[FollowSpeed] playerSpeed={}, factor={}, followSpeed={}", playerSpeed, factor, followSpeed);
-        return followSpeed;
+        double followSpeed = playerSpeed * multiplier * factor;
+        return Math.max(playerSpeed, followSpeed);
     }
 
-    /**
-     * 出击速度（高速档）= 跟随速度 × 1.5（由战斗策略直接控制，此处不计算）
-     * 因为战斗中的移动由策略驱动，速度由策略内部设定。
-     */
-    public double getStrikeSpeed() {
-        // 出击速度固定为 0.35 × 1.5 = 0.525（可配置）
-        return 0.525;
+    public double getStrikeSpeed(LivingEntity owner) {
+        double followSpeed = getFollowSpeed(owner); // 动态跟随速度
+        double multiplier = doll.getDollData().getStrikeSpeedMultiplier(); // 默认1.5
+        return followSpeed * multiplier;
     }
 
-    // ========== 供战斗策略调用的移动辅助方法 ==========
+    // ========== 辅助方法 ==========
 
     /**
      * 强制将人偶移动到指定位置（用于冲锋、瞬移等）

@@ -7,7 +7,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import org.aliceGrimoire.alicegrimoire.Alicegrimoire;
-import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
+import org.aliceGrimoire.alicegrimoire.entity.doll.data.DollJobType;
 
 public class ModCreativeModeTabs {
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, Alicegrimoire.MODID);
@@ -24,7 +24,7 @@ public class ModCreativeModeTabs {
                 output.accept(ModItems.DOLL_BASKET.get());
                 output.accept(ModItems.DOLL_WHISTLE.get());
                 
-                for (DollType type : DollType.values()) {
+                for (DollJobType type : DollJobType.values()) {
                     ItemStack stack = new ItemStack(ModItems.DOLL.get());
                     stack.set(ModDataComponents.DOLL_TYPE.get(), type);
                     output.accept(stack);

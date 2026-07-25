@@ -8,7 +8,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import org.aliceGrimoire.alicegrimoire.Alicegrimoire;
-import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
+import org.aliceGrimoire.alicegrimoire.entity.doll.data.DollJobType;
 
 import java.util.List;
 
@@ -26,11 +26,11 @@ public class ModDataComponents {
                     .build());
 
     // 人偶类型（用于物品形式存储）
-    public static final DeferredHolder<DataComponentType<?>, DataComponentType<DollType>> DOLL_TYPE =
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<DollJobType>> DOLL_TYPE =
             DATA_COMPONENT_TYPES.register("doll_type",
-                () -> DataComponentType.<DollType>builder()
-                    .persistent(DollType.CODEC)
-                    .networkSynchronized(DollType.STREAM_CODEC)
+                () -> DataComponentType.<DollJobType>builder()
+                    .persistent(DollJobType.CODEC)
+                    .networkSynchronized(DollJobType.STREAM_CODEC)
                     .build());
 
     // 织魔台改装组件列表

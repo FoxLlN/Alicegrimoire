@@ -9,7 +9,7 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
-import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
+import org.aliceGrimoire.alicegrimoire.entity.doll.data.DollJobType;
 import org.aliceGrimoire.alicegrimoire.registry.ModBlockEntities;
 import software.bernie.geckolib.animatable.GeoBlockEntity;
 import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
@@ -18,17 +18,17 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 
 public class DollBlockEntity extends BlockEntity implements GeoBlockEntity {
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
-    private DollType type = DollType.STANDARD;
+    private DollJobType type = DollJobType.STANDARD;
 
     public DollBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.DOLL.get(), pos, state);
     }
 
-    public DollType getDollType() {
+    public DollJobType getDollType() {
         return type;
     }
 
-    public void setDollType(DollType type) {
+    public void setDollType(DollJobType type) {
         this.type = type;
         this.setChanged();
         if (level != null) {
@@ -42,14 +42,14 @@ public class DollBlockEntity extends BlockEntity implements GeoBlockEntity {
         tag.putString("DollType", type.name());
     }
 
-    @Override
+ @Override
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         if (tag.contains("DollType")) {
             try {
-                this.type = DollType.valueOf(tag.getString("DollType"));
+                this.type = DollJobType.valueOf(tag.getString("DollType"));
             } catch (Exception e) {
-                this.type = DollType.STANDARD;
+                this.type = DollJobType.STANDARD;
             }
         }
     }

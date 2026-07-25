@@ -8,7 +8,7 @@ import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
 /**
- * 近战策略：标准人偶、持剑人偶共用。
+ * 近战策略：标准人偶。
  * - 瞄准目标腰部，攻击判定采用圆柱体范围（水平距离 + 垂直容差）
  * - 攻击前强制面向目标，自动适应目标高度（低头/抬头攻击）
  * - 攻击距离 1.5 格，停止距离 1.0 格
@@ -39,15 +39,13 @@ public class MeleeStrategy implements ICombatStrategy {
         double targetY = target.getY() + targetHeight;
         double dy = targetY - doll.getY();
 
-        // ---- 打印当前关键数据 ----
-        LOGGER.info("【调试】水平距离={}}, 垂直差值={}, 目标腰部Y={}, 人偶Y={}",
-                horizontalDist, dy, targetY, doll.getY());
-
         // ---- 面向目标腰部（支持低头/抬头） ----
         doll.getLookControl().setLookAt(
                 target.getX(), targetY, target.getZ(),
                 60.0F, 60.0F
         );
+
+        //LOGGER.info("【移动】目标高度为{}", targetY);
 
         // ---- 移动逻辑：停在目标前方 1.0 格 ----
         Vec3 targetPos = null;
@@ -66,10 +64,11 @@ public class MeleeStrategy implements ICombatStrategy {
             // LOGGER.info("【移动】水平距离>停止距离，目标点=({}, {}, {)", targetPos.x, targetPos.y, targetPos.z);
             doll.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, 1.0);
         } else if (horizontalDist < 0.5 && Math.abs(dy) > 1.0) {
-            // 水平很近但垂直距离较大，只做垂直移动
-            targetPos = new Vec3(doll.getX(), targetY, doll.getZ());
-            // LOGGER.info("【移动】水平很近但垂直差大，垂直移动目标点=({}, {}, {})", targetPos.x, targetPos.y, targetPos.z);
+            double targetYMove = doll.getY() + dy * 0.3; // 已经是平滑
+            // 但若 dy 很大，可进一步限制单次移动量
+            targetPos = new Vec3(doll.getX(), targetYMove, doll.getZ());
             doll.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, 1.0);
+            // LOGGER.info("【移动】水平小于 高度为{}.", targetPos.y);
         } else {
             // LOGGER.info("【移动】距离合适，不移动。水平距离={}, 垂直差值={}", horizontalDist, dy);
         }

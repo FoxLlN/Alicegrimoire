@@ -10,7 +10,7 @@ import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import org.aliceGrimoire.alicegrimoire.entity.doll.DollType;
+import org.aliceGrimoire.alicegrimoire.entity.doll.data.DollJobType; 
 import org.aliceGrimoire.alicegrimoire.item.DollItem;
 import org.aliceGrimoire.alicegrimoire.item.DollStringItem;
 import org.aliceGrimoire.alicegrimoire.item.DollWandItem;
@@ -121,7 +121,7 @@ public class MagiweaverMenu extends AbstractContainerMenu {
         ItemStack centerStack = centerContainer.getItem(0);
         if (!centerStack.isEmpty()) {
             List<ItemStack> comps = new ArrayList<>();
-            DollType newType = DollType.STANDARD;
+            DollJobType newType = DollJobType.STANDARD;
             for (int i = 0; i < 8; i++) {
                 ItemStack s = componentContainer.getItem(i);
                 if (!s.isEmpty()) {
@@ -129,11 +129,11 @@ public class MagiweaverMenu extends AbstractContainerMenu {
                     
                     // Update doll type based on exclusive item
                     if (centerStack.getItem() instanceof DollItem) {
-                        if (s.getItem() == Items.IRON_SWORD) newType = DollType.SWORD;
-                        else if (s.getItem() == Items.SHIELD) newType = DollType.GUARD;
-                        else if (s.getItem() == Items.CROSSBOW) newType = DollType.PILLAGER;
-                        else if (s.getItem() == Items.TRIDENT) newType = DollType.LANCER;
-                        else if (s.getItem() == Items.BOW) newType = DollType.SHARPSHOOTER;
+                        if (s.getItem() == Items.IRON_SWORD) newType = DollJobType.STANDARD;
+                        else if (s.getItem() == Items.SHIELD) newType = DollJobType.DEFENDER;
+                        else if (s.getItem() == Items.CROSSBOW) newType = DollJobType.SHARPSHOOTER;
+                        else if (s.getItem() == Items.TRIDENT) newType = DollJobType.VANGUARD;
+                        else if (s.getItem() == Items.BOW) newType = DollJobType.SHARPSHOOTER;
                     }
                 }
             }
