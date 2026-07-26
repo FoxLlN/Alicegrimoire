@@ -2,10 +2,6 @@ package org.aliceGrimoire.alicegrimoire.entity.doll.combat;
 
 import net.minecraft.world.entity.LivingEntity;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
-import org.aliceGrimoire.alicegrimoire.entity.doll.data.DollJobType;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 战斗管理器
@@ -13,7 +9,6 @@ import java.util.Map;
  */
 public class DollCombatManager {
     private final DollEntity doll;
-    private final Map<DollJobType, ICombatStrategy> strategyCache = new HashMap<>();
 
     public DollCombatManager(DollEntity doll) {
         this.doll = doll;
@@ -31,9 +26,12 @@ public class DollCombatManager {
     }
 
     /**
-     * 强制刷新策略（当职业或武器变更时调用）
+     * 重置当前策略（当人偶重新进入战斗状态时调用）
      */
-    public void refreshStrategy() {
-        // 由 DollDataManager 负责刷新
+    public void resetStrategy() {
+        ICombatStrategy strategy = doll.getDataManager().getCurrentStrategy();
+        if (strategy != null) {
+            strategy.reset();
+        }
     }
 }

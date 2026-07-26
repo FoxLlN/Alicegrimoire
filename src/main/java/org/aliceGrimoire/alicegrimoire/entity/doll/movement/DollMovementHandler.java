@@ -18,6 +18,7 @@ import com.mojang.logging.LogUtils;
  * 速度三档：游荡（0.1）、跟随（动态）、出击（0.35×1.5）
  */
 public class DollMovementHandler {
+    private static final java.util.Random RANDOM = new java.util.Random();
 
     private static final org.slf4j.Logger LOGGER = LogUtils.getLogger();
     private final DollEntity doll;
@@ -54,17 +55,19 @@ public class DollMovementHandler {
                     Vec3 followPos = calculateFollowPosition(owner);
                     double speed = getFollowSpeed(owner);
                     setWantedPosition(followPos, speed);
-
-                    // 🎯 面向玩家
-                    //doll.getLookControl().setLookAt(owner, 30.0F, 30.0F);
-                    // 同步身体旋转，避免头身分离
-                    //doll.yBodyRot = doll.getYRot();
                 }
                 break;
 
             case ENGAGING:
+                // 战斗期间，移动由战斗策略控制
+                break;
             case RECOVERING:
-                // 战斗和恢复期间，移动由战斗策略控制
+                // 返回玩家
+                if (owner != null && doll.isPlayerActivelyMoving()) {
+                    Vec3 followPos = calculateFollowPosition(owner);
+                    double speed = Math.max(getFollowSpeed(owner) * 0.8, 0.15);
+                    setWantedPosition(followPos, speed);
+                }
                 break;
         }
     }
@@ -117,11 +120,13 @@ public class DollMovementHandler {
 
     // ========== 速度方法（从 DollData 读取） ==========
 
-    private double getWanderSpeed() {
+    // 计算游荡速度（默认 0.1）
+    public double getWanderSpeed() {
         return doll.getDollData().getWanderSpeed();
     }
 
-    private double getFollowSpeed(LivingEntity owner) {
+    // 计算跟随速度
+    public double getFollowSpeed(LivingEntity owner) {
         double multiplier = doll.getDollData().getFollowSpeedMultiplier();
         
         double playerSpeed = PlayerMoveDetector.getPlayerSpeed(owner.getUUID());
@@ -142,6 +147,7 @@ public class DollMovementHandler {
         return Math.max(playerSpeed, followSpeed);
     }
 
+    // ========== 移动方法 ==========
     public double getStrikeSpeed(LivingEntity owner) {
         double followSpeed = getFollowSpeed(owner); // 动态跟随速度
         double multiplier = doll.getDollData().getStrikeSpeedMultiplier(); // 默认1.5
@@ -162,5 +168,53 @@ public class DollMovementHandler {
      */
     public void teleportTo(Vec3 target) {
         doll.moveTo(target.x, target.y, target.z);
+    }
+
+    
+    /**
+     * 以指定倍率跟随玩家（使用跟随速度作为基准）
+     * @param doll 人偶实体
+     * @param owner 玩家实体
+     * @param speedMultiplier 速度倍率（1.0 = 正常跟随速度，0.4 = 缓慢跟随）
+     * @param desiredDistance 期望与玩家的水平距离
+     */
+    public void followOwner(DollEntity doll, LivingEntity owner, double speedMultiplier, double desiredDistance) {
+        if (owner == null) return;
+        
+        double dx = doll.getX() - owner.getX();
+        double dz = doll.getZ() - owner.getZ();
+        double horizontalDist = Math.sqrt(dx * dx + dz * dz);
+        
+        // 如果在理想距离范围内，仅做随机飘动
+        if (Math.abs(horizontalDist - desiredDistance) < 0.5) {
+            if (doll.tickCount % 20 == 0) {
+                double angle = RANDOM.nextDouble() * 2 * Math.PI;
+                Vec3 randomOffset = new Vec3(Math.cos(angle) * 0.5, 0, Math.sin(angle) * 0.5);
+                Vec3 targetPos = owner.position().add(randomOffset.x, 1.0, randomOffset.z);
+                doll.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, 0.1);
+            }
+            return;
+        }
+        
+        // 【核心改动】使用 getFollowSpeed 获取基准速度
+        double baseSpeed = getFollowSpeed(owner);
+        double speed = Math.min(baseSpeed * speedMultiplier, 1.0);
+        
+        // 计算目标方向
+        Vec3 dirFromOwner;
+        if (horizontalDist < 0.01) {
+            dirFromOwner = owner.getLookAngle();
+        } else {
+            dirFromOwner = new Vec3(dx / horizontalDist, 0, dz / horizontalDist);
+        }
+        
+        Vec3 targetPos = owner.position().add(
+            dirFromOwner.x * desiredDistance,
+            1.0 + (doll.getRandom().nextDouble() - 0.5) * 0.5,
+            dirFromOwner.z * desiredDistance
+        );
+        
+        doll.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, speed);
+        doll.getLookControl().setLookAt(owner, 30.0F, 30.0F);
     }
 }

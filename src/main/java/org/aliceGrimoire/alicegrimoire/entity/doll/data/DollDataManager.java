@@ -64,15 +64,7 @@ public class DollDataManager {
             case STANDARD -> new MeleeStrategy();
             
             // === 近卫AI（四步循环） ===
-            case GUARD -> {
-                if (weapon == WeaponType.TRIDENT) {
-                    yield new GuardTridentStrategy();      // 三叉戟激流冲刺
-                } else if (weapon == WeaponType.CROSSBOW || weapon == WeaponType.BOW) {
-                    yield new GuardRangedStrategy();       // 远程抵近射击（保持2格）
-                } else {
-                    yield new GuardMeleeStrategy();        // 默认近战（剑/长矛）
-                }
-            }
+            case GUARD -> new GuardStrategy();
             
             // === 守御AI（举盾保护） ===
             case DEFENDER -> new DefenderStrategy();

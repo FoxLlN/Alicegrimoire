@@ -4,6 +4,8 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.combat.ICombatStrategy;
+import org.aliceGrimoire.alicegrimoire.entity.doll.data.CombatParameters;
+
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
@@ -19,15 +21,17 @@ public class MeleeStrategy implements ICombatStrategy {
     private static final Logger LOGGER = LogUtils.getLogger();
     
     private int attackCooldown = 0;
-    
-    // 配置参数
-    private static final double ATTACK_RANGE = 1.5;          // 攻击水平距离
-    private static final double ATTACK_VERTICAL_RANGE = 3.0; // 攻击垂直容差（腰部上下 ±1.5 格）
-    private static final double STOP_DISTANCE = 1.0;          // 停止水平距离
 
     @Override
     public void tick(DollEntity doll, LivingEntity target, LivingEntity owner) {
         if (target == null || !target.isAlive()) return;
+        
+        // 从 DollData 读取所有参数
+        CombatParameters params = doll.getDollData().getCombatParams();
+        double attackRange = params.getAttackRange();
+        double attackVerticalRange = params.getAttackVerticalRange();
+        double stopDistance = params.getStopDistance();
+        int cooldownMax = params.getAttackCooldown();
 
         // ---- 计算距离 ----
         double dx = target.getX() - doll.getX();
@@ -49,10 +53,10 @@ public class MeleeStrategy implements ICombatStrategy {
 
         // ---- 移动逻辑：停在目标前方 1.0 格 ----
         Vec3 targetPos = null;
-        if (horizontalDist > STOP_DISTANCE) {
+        if (horizontalDist > stopDistance) {
             Vec3 horizontalDir = new Vec3(dx / horizontalDist, 0, dz / horizontalDist);
-            double targetX = target.getX() - horizontalDir.x * STOP_DISTANCE;
-            double targetZ = target.getZ() - horizontalDir.z * STOP_DISTANCE;
+            double targetX = target.getX() - horizontalDir.x * stopDistance;
+            double targetZ = target.getZ() - horizontalDir.z * stopDistance;
             
             // Y 轴移动：平滑靠近目标腰部高度
             double targetYMove = doll.getY() + dy * 0.3;
@@ -80,8 +84,8 @@ public class MeleeStrategy implements ICombatStrategy {
         }
 
         // ---- 攻击判定（圆柱体范围：水平距离 + 垂直容差） ----
-        boolean horizontalInRange = horizontalDist <= ATTACK_RANGE;
-        boolean verticalInRange = Math.abs(dy) <= ATTACK_VERTICAL_RANGE;
+        boolean horizontalInRange = horizontalDist <= attackRange;
+        boolean verticalInRange = Math.abs(dy) <= attackVerticalRange;
         boolean canSee = doll.getSensing().hasLineOfSight(target);
 
         // LOGGER.info("【攻击判定】水平在范围内={}, 垂直在范围内={}, 视线可见={}", horizontalInRange, verticalInRange, canSee);
@@ -98,7 +102,7 @@ public class MeleeStrategy implements ICombatStrategy {
                 // LOGGER.info("【攻击】对目标 {} 发动了攻击！", target.getName().getString());
             }
             
-            attackCooldown = 10; // 0.5 秒冷却
+            attackCooldown = cooldownMax; // 0.5 秒冷却
         }
     }
 

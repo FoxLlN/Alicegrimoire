@@ -26,4 +26,11 @@ public interface ICombatStrategy {
      * @return true 如果当前正在攻击动画中
      */
     boolean isAttacking();
+
+    /**
+     * 重置策略内部状态（当人偶重新进入战斗时调用）
+     * 默认实现为空，子类按需覆盖
+     */
+    default void reset() {}
+
 }

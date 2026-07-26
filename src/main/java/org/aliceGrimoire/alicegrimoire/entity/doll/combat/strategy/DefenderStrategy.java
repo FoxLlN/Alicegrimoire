@@ -4,6 +4,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.combat.ICombatStrategy;
+import org.aliceGrimoire.alicegrimoire.entity.doll.data.CombatParameters;
 
 /**
  * 守御策略：持盾保护玩家

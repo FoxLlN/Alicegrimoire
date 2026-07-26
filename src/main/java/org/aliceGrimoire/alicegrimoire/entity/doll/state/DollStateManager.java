@@ -75,6 +75,7 @@ public class DollStateManager {
                 // 如果被激怒且有目标，直接进入战斗（即使玩家不动）
                 if (isEnraged && hasValidTarget) {
                     setState(DollState.ENGAGING);
+                    doll.getCombatManager().resetStrategy();
                 }
                 break;
 
@@ -90,6 +91,7 @@ public class DollStateManager {
                 // 激怒且有目标 -> 战斗
                 else if (isEnraged && hasValidTarget) {
                     setState(DollState.ENGAGING);
+                    doll.getCombatManager().resetStrategy();
                 }
                 break;
 
@@ -112,6 +114,7 @@ public class DollStateManager {
                 if (isEnraged && hasValidTarget) {
                     setState(DollState.ENGAGING);
                     recoveryTicks = 0;
+                    doll.getCombatManager().resetStrategy();
                     break;
                 }
                 // 冷却倒计时

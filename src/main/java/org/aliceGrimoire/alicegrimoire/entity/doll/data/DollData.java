@@ -50,6 +50,9 @@ public class DollData {
     
     // ========== 自定义扩展 ==========
     private CompoundTag customData;       // 自定义数据 (未来扩展)
+
+    // ========== 战斗参数 ==========
+    private CombatParameters combatParams = new CombatParameters();
     
     // ========== 构造函数 ==========
     public DollData() {
@@ -138,6 +141,32 @@ public class DollData {
     public int getRibbonColor() { return ribbonColor; }
     public void setRibbonColor(int ribbonColor) { this.ribbonColor = ribbonColor; }
     
+    public CombatParameters getCombatParams() { return combatParams; }
+    public void setCombatParams(CombatParameters combatParams) { 
+        this.combatParams = combatParams; 
+    }
+
+    // ========== 快捷访问方法（供策略类使用） ==========
+    public double getStopDistance() { return combatParams.getStopDistance(); }
+    public int getChargeDuration() { return combatParams.getChargeDuration(); }
+    public double getStickRange() { return combatParams.getStickRange(); }
+    public double getStickAttackRange() { return combatParams.getStickAttackRange(); }
+    public double getShootRange() { return combatParams.getShootRange(); }
+    public int getShootCooldown() { return combatParams.getShootCooldown(); }
+    public double getMinDistance() { return combatParams.getMinDistance(); }
+    public double getMaxDistance() { return combatParams.getMaxDistance(); }
+    public int getStrafeInterval() { return combatParams.getStrafeInterval(); }
+    public int getSharpshooterCooldown() { return combatParams.getSharpshooterCooldown(); }
+    public double getTridentMinDistance() { return combatParams.getTridentMinDistance(); }
+    public double getTridentMaxDistance() { return combatParams.getTridentMaxDistance(); }
+    public int getTridentCooldown() { return combatParams.getTridentCooldown(); }
+    public int getVanguardChargeDuration() { return combatParams.getVanguardChargeDuration(); }
+    public double getAttackDistance() { return combatParams.getAttackDistance(); }
+    public int getLancerChargeDelay() { return combatParams.getLancerChargeDelay(); }
+    public int getLancerChargeDuration() { return combatParams.getLancerChargeDuration(); }
+    public double getLancerChargeSpeed() { return combatParams.getLancerChargeSpeed(); }
+    public DamageReactionType getReactionType() { return combatParams.getReactionType(); }
+    
     // ========== 辅助方法 ==========
     private WeaponType detectWeaponType(ItemStack stack) {
         return WeaponType.fromItemStack(stack);
@@ -209,7 +238,8 @@ public class DollData {
             wanderSpeed, followSpeedMultiplier, strikeSpeedMultiplier,
             tetherRange, attackRange, attackVerticalRange, attackCooldown,
             flightSpeed, turnSpeed, jobType, hasShield,
-            hairColor, eyeColor, ribbonColor
+            hairColor, eyeColor, ribbonColor,
+            combatParams.copy()
         ));
         if (!weapon.isEmpty()) {
             copy.setWeapon(weapon.copy());

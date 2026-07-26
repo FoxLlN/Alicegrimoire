@@ -62,9 +62,6 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
             SynchedEntityData.defineId(DollEntity.class, EntityDataSerializers.LONG);
     private static final EntityDataAccessor<Boolean> IS_ENRAGED =
             SynchedEntityData.defineId(DollEntity.class, EntityDataSerializers.BOOLEAN);
-    // 保留 DOLL_TYPE 用于向后兼容（但实际数据由 DollData 管理）
-    private static final EntityDataAccessor<String> DOLL_TYPE =
-            SynchedEntityData.defineId(DollEntity.class, EntityDataSerializers.STRING);
     private static final EntityDataAccessor<Boolean> IS_TETHERED =
             SynchedEntityData.defineId(DollEntity.class, EntityDataSerializers.BOOLEAN);
 
@@ -99,7 +96,6 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         builder.define(OWNER_UUID, Optional.empty());
         builder.define(EVOKE_TIME, 0L);
         builder.define(IS_ENRAGED, false);
-        builder.define(DOLL_TYPE, DollJobType.STANDARD.name());
         builder.define(IS_TETHERED, false);
     }
 
@@ -151,7 +147,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         }
 
         // 7. 人偶互相排斥
-        if (!this.level().isClientSide && this.noPhysics) {
+        if (!this.level().isClientSide && this.noPhysics && this.tickCount % 2 == 0) {
             applyRepulsion();
         }
     }
@@ -160,31 +156,35 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
      * 应用人偶之间的排斥力
      */
     private void applyRepulsion() {
+        // 使用 AABB 膨胀检测，只获取最近的人偶
         List<DollEntity> nearby = this.level().getEntitiesOfClass(
             DollEntity.class,
             this.getBoundingBox().inflate(1.5),
             other -> other != this && other.noPhysics
         );
         
-        Vec3 totalRepel = Vec3.ZERO;
+        if (nearby.isEmpty()) return;
+        
+        double repelX = 0, repelY = 0, repelZ = 0;
         for (DollEntity other : nearby) {
-            Vec3 delta = this.position().subtract(other.position());
-            double dist = delta.length();
-            if (dist < 0.8 && dist > 0.01) {
-                double strength = 0.2 / (dist + 0.1);
-                Vec3 repel = delta.normalize().scale(strength);
-                totalRepel = totalRepel.add(repel);
-                // 同时给对方施加反向力
-                other.applyRepulsionFrom(this, repel);
+            double dx = this.getX() - other.getX();
+            double dy = this.getY() - other.getY();
+            double dz = this.getZ() - other.getZ();
+            double distSq = dx*dx + dy*dy + dz*dz;
+            if (distSq < 0.64 && distSq > 0.0001) { // 0.8格以内
+                double strength = 0.2 / (Math.sqrt(distSq) + 0.1);
+                repelX += dx * strength;
+                repelY += dy * strength;
+                repelZ += dz * strength;
+                // 同步给对面施加反向力
+                other.applyRepulsionFrom(this, new Vec3(-dx * strength, -dy * strength, -dz * strength));
             }
         }
         
-        if (totalRepel.lengthSqr() > 0) {
-            // 直接修改位置（而不是速度），确保立即生效
-            Vec3 newPos = this.position().add(totalRepel);
+        if (repelX != 0 || repelY != 0 || repelZ != 0) {
+            Vec3 newPos = this.position().add(repelX, repelY, repelZ);
             this.moveTo(newPos.x, newPos.y, newPos.z);
-            // 同时也设置速度，保持平滑
-            this.setDeltaMovement(this.getDeltaMovement().add(totalRepel));
+            this.setDeltaMovement(this.getDeltaMovement().add(repelX, repelY, repelZ));
         }
     }
 
@@ -309,14 +309,12 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         return dataManager.getData();
     }
 
-    // ========== 职业相关（推荐新代码使用） ==========
+    // ========== 职业相关 ==========
     public DollJobType getJobType() {
         return dataManager.getData().getJobType();
     }
     public void setJobType(DollJobType jobType) {
         dataManager.setJobType(jobType);
-        // 更新同步字段（向后兼容）
-        this.entityData.set(DOLL_TYPE, jobType.name());
     }
 
     // ========== 破损状态 ==========
@@ -429,8 +427,6 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         // 保存完整数据
         tag.put("DollData", dataManager.save(this.level().registryAccess()));
         tag.putBoolean("IsEnraged", this.isEnraged());
-        // 向后兼容
-        tag.putString("DollType", getJobType().name());
     }
 
     @Override
@@ -441,17 +437,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         }
         if (tag.contains("DollData")) {
             dataManager.load(tag.getCompound("DollData"), this.level().registryAccess());
-        } else {
-            // 向后兼容：从旧格式读取
-            if (tag.contains("DollType")) {
-                try {
-                    DollJobType job = DollJobType.valueOf(tag.getString("DollType"));
-                    setJobType(job);
-                } catch (IllegalArgumentException e) {
-                    setJobType(DollJobType.STANDARD);
-                }
-            }
-        }
+        } 
         if (tag.contains("IsEnraged")) {
             this.setEnraged(tag.getBoolean("IsEnraged"));
         }
@@ -501,4 +487,18 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
 
     public long getEnrageTime() { return enrageTime; }
     public void setEnrageTime(long time) { this.enrageTime = time; }
+
+    // 返回移动处理器 管理速度
+    public DollMovementHandler getMovementHandler() {
+        return movementHandler;
+    }
+
+    public void followOwner(LivingEntity owner, double speedMultiplier, double desiredDistance) {
+        this.movementHandler.followOwner(this, owner, speedMultiplier, desiredDistance);
+    }
+
+    // 返回战斗管理器
+    public DollCombatManager getCombatManager() {
+        return combatManager;
+    }
 }
