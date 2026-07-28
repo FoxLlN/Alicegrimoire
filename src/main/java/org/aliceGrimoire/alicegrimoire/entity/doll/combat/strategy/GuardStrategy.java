@@ -9,25 +9,28 @@ import org.aliceGrimoire.alicegrimoire.entity.doll.combat.strategy.reaction.Reac
 import org.aliceGrimoire.alicegrimoire.entity.doll.data.CombatParameters;
 import org.aliceGrimoire.alicegrimoire.entity.doll.data.WeaponType;
 
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
+
 import java.util.Random;
 
 /**
  * 近卫策略：四步循环
  * 根据武器类型自动适配战斗行为：
- * - 近战武器（剑/矛）：近战攻击，冲锋速度 1.8
- * - 远程武器（弓/弩）：抵近射击，保持在 2 格距离
- * - 三叉戟：激流冲锋，冲锋速度 2.5
+ * - 近战武器（剑/矛）：近战攻击
+ * - 远程武器（弓/弩）：抵近射击
+ * - 三叉戟：激流冲锋
  * 
- * 步骤1: 冲锋 → 步骤2: 黏住连击 → 步骤3: 撤回玩家身边 → 步骤4: 等待 2-3 秒
+ * 步骤1: 冲锋 → 步骤2: 黏住连击 → 步骤3: 撤回玩家身边 → 步骤4: 等待
+ * 
+ * 所有数值均从 CombatParameters 读取，支持织魔台改装
  */
 public class GuardStrategy implements ICombatStrategy {
     private static final Random RANDOM = new Random();
+    private static final Logger LOGGER = LogUtils.getLogger();
 
     private enum Phase {
-        CHARGING,      // 冲锋中
-        STICKING,      // 黏住连击
-        RETREATING,    // 撤回
-        WAITING        // 等待
+        CHARGING, STICKING, RETREATING, WAITING
     }
 
     private Phase phase = Phase.CHARGING;
@@ -40,8 +43,6 @@ public class GuardStrategy implements ICombatStrategy {
 
     // ===== 根据武器类型缓存的配置 =====
     private WeaponType cachedWeaponType = WeaponType.NONE;
-    private double chargeSpeed = 1.8;
-    private double stickAttackRange = 2.5;
     private boolean isRanged = false;
     private boolean isTrident = false;
 
@@ -52,6 +53,7 @@ public class GuardStrategy implements ICombatStrategy {
         // 目标变化检测 + 重置
         if (lastTarget != target) {
             reset();
+            doll.resetSmoothedTargetY();
             lastTarget = target;
         }
 
@@ -60,10 +62,12 @@ public class GuardStrategy implements ICombatStrategy {
 
         CombatParameters params = doll.getDollData().getCombatParams();
         int chargeDuration = params.getChargeDuration();
-        double stickRange = params.getStickRange();
-        int attackCooldownMax = params.getAttackCooldown();
-        int shootCooldown = params.getShootCooldown();
-        double shootRange = params.getShootRange();
+        double holdDistance = params.getHoldDistance();
+        double retreatThreshold = params.getRetreatThreshold();
+        double rangedMinDistance = params.getRangedMinDistance();
+
+        //LOGGER.info("[近卫数据]chargeDuration: {}, holdDistance: {}, retreatThreshold: {}, rangedMinDistance: {}", 
+        //            chargeDuration, holdDistance, retreatThreshold, rangedMinDistance);
 
         // 获取伤害反应策略
         if (reactionStrategy == null) {
@@ -91,27 +95,27 @@ public class GuardStrategy implements ICombatStrategy {
         // ===== 状态机主循环 =====
         switch (phase) {
             case CHARGING:
-                handleCharging(doll, target, chargeDuration);
+                handleCharging(doll, target, chargeDuration, holdDistance, params.getChargeSpeed(), rangedMinDistance);
                 break;
 
             case STICKING:
-                handleSticking(doll, target, canSee, dist, stickRange, shootRange,
-                        attackCooldownMax, shootCooldown, stickAttackRange);
+                handleSticking(doll, target, canSee, dist, params);
                 break;
 
             case RETREATING:
-                handleRetreating(doll, owner);
+                handleRetreating(doll, owner, retreatThreshold, params.getRetreatSpeed(), holdDistance, params.getWaitDuration());
                 break;
 
             case WAITING:
-                handleWaiting(doll, owner);
+                handleWaiting(doll, owner, params.getWaitSpeed(), params.getWaitDistance());
                 break;
         }
     }
 
     // ========== 各阶段处理私有方法 ==========
 
-    private void handleCharging(DollEntity doll, LivingEntity target, int chargeDuration) {
+    private void handleCharging(DollEntity doll, LivingEntity target, int chargeDuration, 
+                                double holdDistance, double chargeSpeed, double rangedMinDistance) {
         if (phaseTicks < chargeDuration) {
             if (isTrident) {
                 // 三叉戟：激流冲锋（直接设置速度）
@@ -120,8 +124,11 @@ public class GuardStrategy implements ICombatStrategy {
             } else {
                 // 近战/远程：移动控制冲锋
                 Vec3 dir = target.position().subtract(doll.position()).normalize();
-                double offset = isRanged ? 2.0 : 1.0;
-                Vec3 targetPos = target.position().subtract(dir.scale(offset));
+                double distance = holdDistance;
+                if (isRanged) {
+                    distance = rangedMinDistance;
+                }
+                Vec3 targetPos = target.position().subtract(dir.scale(distance));
                 doll.getMoveControl().setWantedPosition(targetPos.x, target.getY() + 0.5, targetPos.z, chargeSpeed);
             }
             phaseTicks++;
@@ -131,70 +138,114 @@ public class GuardStrategy implements ICombatStrategy {
         }
     }
 
+    /**
+     * 黏住阶段（STICKING）处理
+     * 
+     * @param doll              人偶实体
+     * @param target            当前攻击目标
+     * @param canSee            是否视线通畅
+     * @param currentDist       当前与目标的距离
+     * @param params            战斗参数（包含所有配置）
+     */
     private void handleSticking(DollEntity doll, LivingEntity target, boolean canSee,
-                                double dist, double stickRange, double shootRange,
-                                int attackCooldownMax, int shootCooldown, double stickAttackRange) {
-        // 移动逻辑
+                                double currentDist, CombatParameters params) {
+        // 从参数中获取各项配置
+        double holdDist = params.getHoldDistance();          // 近战黏住距离
+        double minRange = params.getRangedMinDistance();     // 远程最小攻击距离
+        double maxRange = params.getRangedMaxDistance();     // 远程最大攻击距离
+        int meleeCooldown = params.getAttackCooldown();      // 近战攻击冷却
+        int rangedCooldown = params.getRangedCooldown();     // 远程射击冷却
+        double meleeReach = params.getAttackRange();         // 近战攻击距离（判定范围）
+        double speed = params.getChargeSpeed();              // 移动速度倍率
+
+        // 死区：距离在 [minRange - 0.3, minRange + 0.5] 内不移动，避免频繁调整
+        double deadZoneLow = 0.3;   // 低于 minRange - 0.3 时后退
+        double deadZoneHigh = 0.5;  // 高于 minRange + 0.5 时靠近
+
+        // ---------- 移动逻辑 ----------
         if (isRanged) {
-            // 远程：保持 2 格距离
-            if (dist > shootRange + 0.5) {
+            // ===== 远程模式：抵近射击，保持在 minRange 附近 =====
+            double targetDist = minRange;
+            double diff = currentDist - targetDist;
+
+            if (diff > deadZoneHigh) {
+                // 太远：靠近到 targetDist
                 Vec3 dir = target.position().subtract(doll.position()).normalize();
-                Vec3 targetPos = target.position().subtract(dir.scale(shootRange));
-                doll.getMoveControl().setWantedPosition(targetPos.x, target.getY() + 0.5, targetPos.z, 0.8);
-            } else if (dist < shootRange - 0.5) {
+                Vec3 targetPos = target.position().subtract(dir.scale(targetDist));
+                double smoothedY = doll.getSmoothedTargetY(target);
+                doll.getMoveControl().setWantedPosition(
+                    targetPos.x, smoothedY + 0.1, targetPos.z, speed
+                );
+            } else if (diff < -deadZoneLow) {
+                // 太近：后退到 targetDist + 0.3（留出缓冲，避免反复后退）
+                double backDist = targetDist + 0.3;
                 Vec3 away = doll.position().subtract(target.position()).normalize();
-                Vec3 targetPos = doll.position().add(away.scale(0.5));
-                doll.getMoveControl().setWantedPosition(targetPos.x, target.getY() + 0.5, targetPos.z, 0.8);
+                // 计算需要后退的距离，使最终距离约为 backDist
+                double moveBack = backDist - currentDist;
+                Vec3 targetPos = doll.position().add(away.scale(moveBack));
+                double smoothedY = doll.getSmoothedTargetY(target);
+                doll.getMoveControl().setWantedPosition(
+                    targetPos.x, smoothedY + 0.1, targetPos.z, speed
+                );
             }
+            // 在死区内：不主动移动，让目标或其它因素自然调整
         } else {
-            // 近战/三叉戟：保持在目标周围
-            if (dist > stickRange) {
+            // ===== 近战模式：保持在 holdDist 附近 =====
+            if (currentDist > holdDist) {
                 Vec3 dir = target.position().subtract(doll.position()).normalize();
-                Vec3 targetPos = target.position().subtract(dir.scale(stickRange - 0.5));
-                doll.getMoveControl().setWantedPosition(targetPos.x, target.getY() + 0.5, targetPos.z, 1.0);
-            } else if (dist < 1.0) {
+                Vec3 targetPos = target.position().subtract(dir.scale(holdDist - 0.5));
+                double smoothedY = doll.getSmoothedTargetY(target);
+                doll.getMoveControl().setWantedPosition(
+                    targetPos.x, smoothedY + 0.1, targetPos.z, speed
+                );
+            } else if (currentDist < 1.0) {
                 Vec3 away = doll.position().subtract(target.position()).normalize();
                 Vec3 targetPos = doll.position().add(away.scale(1.0));
-                doll.getMoveControl().setWantedPosition(targetPos.x, target.getY() + 0.5, targetPos.z, 0.8);
+                double smoothedY = doll.getSmoothedTargetY(target);
+                doll.getMoveControl().setWantedPosition(
+                    targetPos.x, smoothedY + 0.1, targetPos.z, speed
+                );
             }
         }
 
-        // 攻击判定
+        // ---------- 攻击判定 ----------
         if (attackCooldown > 0) {
             attackCooldown--;
-        } else if (canSee) {
-            if (isRanged) {
-                // 远程攻击
-                if (dist <= 8.0 && dist >= 1.0 && !doll.isSameOwner(target)) {
-                    doll.performRangedAttack(target, 1.0F);
-                    attackCooldown = shootCooldown;
-                }
-            } else {
-                // 近战攻击（包括三叉戟）
-                double range = isTrident ? 2.5 : stickAttackRange;
-                if (dist <= range && !doll.isSameOwner(target)) {
-                    doll.doHurtTarget(target);
-                    attackCooldown = attackCooldownMax;
-                }
+            return;
+        }
+
+        if (!canSee) return;
+
+        if (isRanged) {
+            // 远程攻击：距离在 [minRange - deadZoneLow, maxRange] 之间
+            if (currentDist >= minRange - deadZoneLow && currentDist <= maxRange && !doll.isSameOwner(target)) {
+                doll.performRangedAttack(target, 1.0F);
+                attackCooldown = rangedCooldown;
+            }
+        } else {
+            // 近战攻击：距离 ≤ meleeReach
+            if (currentDist <= meleeReach && !doll.isSameOwner(target)) {
+                doll.doHurtTarget(target);
+                attackCooldown = meleeCooldown;
             }
         }
     }
 
-    private void handleRetreating(DollEntity doll, LivingEntity owner) {
+    private void handleRetreating(DollEntity doll, LivingEntity owner, double retreatThreshold, double retreatSpeed, double holdDistance, int waitDurationBase) {
         double distToOwner = doll.distanceTo(owner);
-        if (distToOwner > 3.0) {
-            doll.followOwner(owner, 1.2, 1.5);
+        if (distToOwner > retreatThreshold) {
+            doll.followOwner(owner, retreatSpeed, holdDistance);
         } else {
             phase = Phase.WAITING;
             phaseTicks = 0;
-            waitDuration = 40 + RANDOM.nextInt(20);
+            waitDuration = waitDurationBase + RANDOM.nextInt(20);
             lastHealth = -1;
         }
     }
 
-    private void handleWaiting(DollEntity doll, LivingEntity owner) {
+    private void handleWaiting(DollEntity doll, LivingEntity owner, double waitSpeed, double waitDistance) {
         if (phaseTicks < waitDuration) {
-            doll.followOwner(owner, 0.8, 1.0);
+            doll.followOwner(owner, waitSpeed, waitDistance);
             phaseTicks++;
         } else {
             phase = Phase.CHARGING;
@@ -212,17 +263,6 @@ public class GuardStrategy implements ICombatStrategy {
         cachedWeaponType = currentWeapon;
         isRanged = (currentWeapon == WeaponType.BOW || currentWeapon == WeaponType.CROSSBOW);
         isTrident = (currentWeapon == WeaponType.TRIDENT);
-
-        if (isTrident) {
-            chargeSpeed = 2.5;
-            stickAttackRange = 2.5;
-        } else if (isRanged) {
-            chargeSpeed = 1.5;
-            stickAttackRange = 2.0;
-        } else {
-            chargeSpeed = 1.8;
-            stickAttackRange = 2.5;
-        }
     }
 
     // ========== ICombatStrategy 接口方法 ==========

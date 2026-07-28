@@ -10,6 +10,7 @@ import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.AttributeSupplier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.RangedAttackMob;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.Arrow;
@@ -19,6 +20,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
 import org.aliceGrimoire.alicegrimoire.entity.doll.data.*;
+import org.aliceGrimoire.alicegrimoire.entity.doll.equipment.DollEquipmentHandler;
 import org.aliceGrimoire.alicegrimoire.entity.doll.state.DollState;
 import org.aliceGrimoire.alicegrimoire.entity.doll.state.DollStateManager;
 import org.aliceGrimoire.alicegrimoire.entity.doll.combat.DollCombatManager;
@@ -55,6 +57,9 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
     // 激怒时间（用于发光等）
     private long enrageTime = 0;
 
+    // 平滑目标Y坐标（用于人偶跟随目标高度时的平滑滤波）
+    private double smoothedTargetY = Double.NaN;
+
     // ========== 同步数据字段 ==========
     private static final EntityDataAccessor<Optional<UUID>> OWNER_UUID =
             SynchedEntityData.defineId(DollEntity.class, EntityDataSerializers.OPTIONAL_UUID);
@@ -64,11 +69,16 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
             SynchedEntityData.defineId(DollEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> IS_TETHERED =
             SynchedEntityData.defineId(DollEntity.class, EntityDataSerializers.BOOLEAN);
-
+    private static final EntityDataAccessor<ItemStack> DATA_MAIN_HAND =
+            SynchedEntityData.defineId(DollEntity.class, EntityDataSerializers.ITEM_STACK);
+    private static final EntityDataAccessor<ItemStack> DATA_OFF_HAND =
+            SynchedEntityData.defineId(DollEntity.class, EntityDataSerializers.ITEM_STACK);
+    
     // ========== 核心管理器 ==========
     private final DollStateManager stateManager;
     private final DollMovementHandler movementHandler;
     private final DollCombatManager combatManager;
+    private final DollEquipmentHandler equipmentHandler;
 
     // ========== GeckoLib 缓存 ==========
     private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
@@ -87,6 +97,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         this.movementHandler = new DollMovementHandler(this, stateManager);
         this.combatManager = new DollCombatManager(this);
         this.moveControl = new DollMoveControl(this);
+        this.equipmentHandler = new DollEquipmentHandler(this);
     }
 
     // ========== 数据同步 ==========
@@ -97,6 +108,8 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         builder.define(EVOKE_TIME, 0L);
         builder.define(IS_ENRAGED, false);
         builder.define(IS_TETHERED, false);
+        builder.define(DATA_MAIN_HAND, ItemStack.EMPTY);
+        builder.define(DATA_OFF_HAND, ItemStack.EMPTY);
     }
 
     // ========== 主要 tick 逻辑 ==========
@@ -144,9 +157,25 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                     this.heal(1.0F);
                 }
             }
+            
+            // 7. 每 5 tick（0.25秒）检测一次周围的物品
+            if (this.tickCount % 5 == 0) {
+                var items = this.level().getEntitiesOfClass(ItemEntity.class, this.getBoundingBox().inflate(1.5));
+                for (ItemEntity itemEntity : items) {
+                    ItemStack stack = itemEntity.getItem();
+                    if (this.equipmentHandler.tryEquip(stack)) {
+                        stack.shrink(1);
+                        if (stack.isEmpty()) {
+                            itemEntity.discard();
+                        }
+                        // LOGGER.info("人偶 {} 拾取了物品 {}", this.getDisplayName().getString(), stack.getDisplayName().getString());
+                        break; // 一次只捡一个
+                    }
+                }
+            }
         }
 
-        // 7. 人偶互相排斥
+        // 8. 人偶互相排斥
         if (!this.level().isClientSide && this.noPhysics && this.tickCount % 2 == 0) {
             applyRepulsion();
         }
@@ -197,6 +226,22 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
             this.moveTo(newPos.x, newPos.y, newPos.z);
             this.setDeltaMovement(this.getDeltaMovement().subtract(repel));
         }
+    }
+
+    public void syncEquipmentToClient() {
+        if (!this.level().isClientSide) { // 只在服务端设置同步数据
+            this.entityData.set(DATA_MAIN_HAND, equipmentHandler.getMainHand());
+            this.entityData.set(DATA_OFF_HAND, equipmentHandler.getOffHand());
+        }
+    }
+
+    
+    public ItemStack getSyncMainHand() {
+        return this.entityData.get(DATA_MAIN_HAND);
+    }
+
+    public ItemStack getSyncOffHand() {
+        return this.entityData.get(DATA_OFF_HAND);
     }
 
     @Override
@@ -391,7 +436,6 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         DollJobType job = getJobType();
         WeaponType weapon = this.getDollData().getWeaponType();
         AbstractArrow arrow = null;
-
         if (job == DollJobType.SHARPSHOOTER) {
             if (weapon == WeaponType.TRIDENT) {
                 // 投射三叉戟（使用三叉戟实体）
@@ -405,6 +449,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         } else if (job == DollJobType.GUARD && (weapon == WeaponType.CROSSBOW || weapon == WeaponType.BOW)) {
             arrow = new Arrow(this.level(), this, new ItemStack(Items.ARROW), null);
             arrow.setBaseDamage(2.0D); // 近卫远程伤害略低
+            LOGGER.info("[远程攻击] 职业类型：" + job + " 武器类型：" + weapon);
         }
 
         if (arrow != null) {
@@ -416,6 +461,46 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
             this.level().addFreshEntity(arrow);
         }
     }
+
+    // ========== 平滑追踪 ==========
+    /**
+     * 获取平滑后的目标Y坐标（过滤击退跳跃等高频抖动）
+     * @param target 当前攻击目标
+     * @return 平滑后的Y坐标
+     */
+    public double getSmoothedTargetY(LivingEntity target) {
+        if (target == null) return this.getY();
+        
+        double realY = target.getY();
+        
+        // 首次初始化
+        if (Double.isNaN(smoothedTargetY)) {
+            smoothedTargetY = realY;
+            return smoothedTargetY;
+        }
+        
+        // 如果目标Y变化过大（比如目标瞬间传送或掉入虚空），直接跳转
+        double delta = realY - smoothedTargetY;
+        if (Math.abs(delta) > 3.0) {
+            smoothedTargetY = realY;
+            return smoothedTargetY;
+        }
+        
+        // 指数平滑：每帧向真实值靠近 20%（即 0.2 的平滑系数）
+        // 系数越小过滤越强，击退跳跃越不明显；系数越大跟随越快
+        double smoothingFactor = 0.15; // 可调整，15% 的权重给新值
+        smoothedTargetY = smoothedTargetY + (realY - smoothedTargetY) * smoothingFactor;
+        
+        return smoothedTargetY;
+    }
+
+    /**
+     * 重置平滑追踪（目标切换时调用）
+     */
+    public void resetSmoothedTargetY() {
+        this.smoothedTargetY = Double.NaN;
+    }
+
 
     // ========== NBT 读写 ==========
     @Override
@@ -437,6 +522,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         }
         if (tag.contains("DollData")) {
             dataManager.load(tag.getCompound("DollData"), this.level().registryAccess());
+            syncEquipmentToClient();
         } 
         if (tag.contains("IsEnraged")) {
             this.setEnraged(tag.getBoolean("IsEnraged"));
@@ -488,7 +574,8 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
     public long getEnrageTime() { return enrageTime; }
     public void setEnrageTime(long time) { this.enrageTime = time; }
 
-    // 返回移动处理器 管理速度
+    // =========== 便捷方法 ==========
+    // ========== 移动处理器 ==========
     public DollMovementHandler getMovementHandler() {
         return movementHandler;
     }
@@ -497,8 +584,41 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         this.movementHandler.followOwner(this, owner, speedMultiplier, desiredDistance);
     }
 
-    // 返回战斗管理器
+    // ========== 战斗管理器 ==========
     public DollCombatManager getCombatManager() {
         return combatManager;
     }
+
+    // ========== 装备处理器 ==========
+    public DollEquipmentHandler getEquipmentHandler() {
+        return equipmentHandler;
+    }
+
+    // ========== 拾取物品时的自动装备 ==========
+    public void pickUpItem(ItemStack stack) {
+        if (stack.isEmpty()) return;
+        // 尝试自动装备
+        if (equipmentHandler.tryEquip(stack)) {
+            // 装备成功，从拾取的物品堆中移除一个
+            stack.shrink(1);
+        }
+        // 装备失败则丢弃（或放入背包，未来实现）
+    }
+
+    public ItemStack getItemInHand() {
+        return getDollData().getWeapon();
+    }
+
+    public ItemStack getItemInOffHand() {
+        return getDollData().getOffHand();
+    }
+
+    public void setItemInHand(ItemStack stack) {
+        getDataManager().setItem(DollSlots.MAIN_HAND, stack);
+    }
+
+    public void setItemInOffHand(ItemStack stack) {
+        getDataManager().setItem(DollSlots.OFF_HAND, stack);
+    }
+    
 }

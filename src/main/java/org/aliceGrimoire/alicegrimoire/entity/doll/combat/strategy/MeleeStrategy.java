@@ -30,9 +30,11 @@ public class MeleeStrategy implements ICombatStrategy {
         CombatParameters params = doll.getDollData().getCombatParams();
         double attackRange = params.getAttackRange();
         double attackVerticalRange = params.getAttackVerticalRange();
-        double stopDistance = params.getStopDistance();
+        double holdDistance = params.getHoldDistance();
         int cooldownMax = params.getAttackCooldown();
-
+        
+        LOGGER.info("默认攻击距离为" + attackRange);
+        
         // ---- 计算距离 ----
         double dx = target.getX() - doll.getX();
         double dz = target.getZ() - doll.getZ();
@@ -51,12 +53,12 @@ public class MeleeStrategy implements ICombatStrategy {
 
         //LOGGER.info("【移动】目标高度为{}", targetY);
 
-        // ---- 移动逻辑：停在目标前方 1.0 格 ----
+        // ---- 移动逻辑：停在目标前方  ----
         Vec3 targetPos = null;
-        if (horizontalDist > stopDistance) {
+        if (horizontalDist > holdDistance) {
             Vec3 horizontalDir = new Vec3(dx / horizontalDist, 0, dz / horizontalDist);
-            double targetX = target.getX() - horizontalDir.x * stopDistance;
-            double targetZ = target.getZ() - horizontalDir.z * stopDistance;
+            double targetX = target.getX() - horizontalDir.x * holdDistance;
+            double targetZ = target.getZ() - horizontalDir.z * holdDistance;
             
             // Y 轴移动：平滑靠近目标腰部高度
             double targetYMove = doll.getY() + dy * 0.3;
@@ -66,12 +68,12 @@ public class MeleeStrategy implements ICombatStrategy {
             
             targetPos = new Vec3(targetX, targetYMove, targetZ);
             // LOGGER.info("【移动】水平距离>停止距离，目标点=({}, {}, {)", targetPos.x, targetPos.y, targetPos.z);
-            doll.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, 1.0);
+            doll.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, params.getChargeSpeed());
         } else if (horizontalDist < 0.5 && Math.abs(dy) > 1.0) {
             double targetYMove = doll.getY() + dy * 0.3; // 已经是平滑
             // 但若 dy 很大，可进一步限制单次移动量
             targetPos = new Vec3(doll.getX(), targetYMove, doll.getZ());
-            doll.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, 1.0);
+            doll.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, params.getChargeSpeed());
             // LOGGER.info("【移动】水平小于 高度为{}.", targetPos.y);
         } else {
             // LOGGER.info("【移动】距离合适，不移动。水平距离={}, 垂直差值={}", horizontalDist, dy);
@@ -89,6 +91,8 @@ public class MeleeStrategy implements ICombatStrategy {
         boolean canSee = doll.getSensing().hasLineOfSight(target);
 
         // LOGGER.info("【攻击判定】水平在范围内={}, 垂直在范围内={}, 视线可见={}", horizontalInRange, verticalInRange, canSee);
+
+        // LOGGER.info("当前武器为" + doll.getDollData().getWeaponType());
 
         if (horizontalInRange && verticalInRange && canSee) {
             // 攻击前再次强制面向目标（确保方向准确）

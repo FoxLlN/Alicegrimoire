@@ -9,13 +9,14 @@ import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.phys.Vec3;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import software.bernie.geckolib.renderer.GeoEntityRenderer;
 
 public class DollRenderer extends GeoEntityRenderer<DollEntity> {
     public DollRenderer(EntityRendererProvider.Context renderManager) {
         super(renderManager, new DollModel<>());
+        // 使用 GeoRenderLayer 正确注册
+        this.addRenderLayer(new DollEquipmentLayer(this, renderManager.getItemRenderer()));
     }
 
     @Override

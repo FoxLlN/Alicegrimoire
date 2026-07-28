@@ -63,7 +63,7 @@ public class DollMovementHandler {
                 break;
             case RECOVERING:
                 // 返回玩家
-                if (owner != null && doll.isPlayerActivelyMoving()) {
+                if (owner != null) {
                     Vec3 followPos = calculateFollowPosition(owner);
                     double speed = Math.max(getFollowSpeed(owner) * 0.8, 0.15);
                     setWantedPosition(followPos, speed);

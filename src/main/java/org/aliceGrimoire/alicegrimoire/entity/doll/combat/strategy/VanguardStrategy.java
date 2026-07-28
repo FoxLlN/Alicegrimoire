@@ -5,98 +5,139 @@ import net.minecraft.world.phys.Vec3;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.combat.ICombatStrategy;
 import org.aliceGrimoire.alicegrimoire.entity.doll.data.CombatParameters;
+import org.aliceGrimoire.alicegrimoire.entity.doll.data.WeaponType;
 
 /**
  * 游击策略：一击脱离
- * 冲向目标 → 攻击一次 → 立即撤回玩家身边 → 等待 2-3 秒 → 重复
- * 与近卫策略类似，但不会在攻击后黏住目标
+ * 近战模式：冲向目标 → 攻击一次 → 立即撤回玩家身边 → 等待 2-3 秒
+ * 远程模式（持有弓/弩/三叉戟时）：冲锋至远程最佳距离 → 射击一次 → 立即撤回玩家身边 → 等待 2-3 秒
  */
 public class VanguardStrategy implements ICombatStrategy {
     private enum Phase {
-        CHARGING,   // 冲锋
-        ATTACKING,  // 攻击（瞬发）
-        RETREATING, // 撤回
-        WAITING     // 等待
+        CHARGING, ATTACKING, RETREATING, WAITING
     }
     private static final java.util.Random RANDOM = new java.util.Random();
-    
+
+    // 临时冷却变量（用于远程攻击冷却）
+    private int attackCooldown = 0;
     private Phase phase = Phase.CHARGING;
-    private int phaseTicks = 0;
+    private int phaseTicks = 0;          // 用于攻击成功后的延迟计时
     private boolean hasAttacked = false;
     private int waitDuration = 40 + RANDOM.nextInt(20);
     private LivingEntity lastTarget = null;
+    private boolean isRanged = false;
+    private WeaponType cachedWeapon = WeaponType.NONE;
+
+    // 新增：尝试攻击计数（防止无限等待）
+    private int attemptTicks = 0;
+    private static final int MAX_ATTEMPT = 30; // 最多尝试1.5秒（30 tick）
 
     @Override
     public void tick(DollEntity doll, LivingEntity target, LivingEntity owner) {
         if (target == null || owner == null) return;
-        
+
         if (lastTarget != target) {
             reset();
             lastTarget = target;
         }
 
-        // 从 DollData 读取所有参数
+        refreshWeaponMode(doll);
+
         CombatParameters params = doll.getDollData().getCombatParams();
-        int chargeDuration = params.getVanguardChargeDuration();
-        double attackDistance = params.getAttackDistance();
+        int chargeDuration = params.getChargeDuration();
+        double holdDistance = params.getHoldDistance();
+        double retreatSpeed = params.getRetreatSpeed();
+        double retreatThreshold = params.getRetreatThreshold();
+        double waitSpeed = params.getWaitSpeed();
+        double waitDistance = params.getWaitDistance();
+        int waitDurationBase = params.getWaitDuration();
+
+        // 远程参数
+        double rangedMin = params.getRangedMinDistance();
+        double rangedMax = params.getRangedMaxDistance();
+        int rangedCooldown = params.getRangedCooldown();
 
         double dist = doll.distanceTo(target);
         boolean canSee = doll.getSensing().hasLineOfSight(target);
-        
+
         doll.getLookControl().setLookAt(target, 30.0F, 30.0F);
 
         switch (phase) {
             case CHARGING:
-                // 冲锋：快速冲向目标
                 if (phaseTicks < chargeDuration) {
                     Vec3 dir = target.position().subtract(doll.position()).normalize();
-                    Vec3 targetPos = target.position().subtract(dir.scale(1.0));
-                    doll.getMoveControl().setWantedPosition(targetPos.x, target.getY() + 0.5, targetPos.z, 2.0);
+                    double stopDistance = isRanged ? rangedMin : holdDistance;
+                    Vec3 targetPos = target.position().subtract(dir.scale(stopDistance));
+                    doll.getMoveControl().setWantedPosition(
+                        targetPos.x, target.getY() + 0.5, targetPos.z,
+                        params.getChargeSpeed()
+                    );
                     phaseTicks++;
                 } else {
-                    // 冲锋结束，进入攻击阶段
                     phase = Phase.ATTACKING;
                     phaseTicks = 0;
                     hasAttacked = false;
+                    attemptTicks = 0; // 重置尝试计数
                 }
                 break;
 
             case ATTACKING:
-                // 攻击（仅在进入阶段时执行一次）
-                if (!hasAttacked && canSee && dist <= attackDistance + 1.0) {
-                    if (!doll.isSameOwner(target)) {
-                        doll.doHurtTarget(target);
+                // ===== 如果尚未攻击，尝试攻击 =====
+                if (!hasAttacked) {
+                    // 尝试攻击
+                    if (canSee) {
+                        if (isRanged) {
+                            if (dist >= rangedMin && dist <= rangedMax && !doll.isSameOwner(target)) {
+                                doll.performRangedAttack(target, 1.0F);
+                                hasAttacked = true;
+                                attackCooldown = rangedCooldown;
+                                phaseTicks = 0; // 重置延迟计时器
+                            }
+                        } else {
+                            if (dist <= params.getAttackRange() + 1.0 && !doll.isSameOwner(target)) {
+                                doll.doHurtTarget(target);
+                                hasAttacked = true;
+                                phaseTicks = 0; // 重置延迟计时器
+                            }
+                        }
                     }
-                    hasAttacked = true;
-                }
-                phaseTicks++;
-                // 无论是否攻击成功，0.3 秒后进入撤回阶段
-                if (phaseTicks > 6) {
-                    phase = Phase.RETREATING;
-                    phaseTicks = 0;
+
+                    // 增加尝试计数
+                    attemptTicks++;
+                    // 如果尝试次数过多仍未能攻击，强制撤回（避免无限卡住）
+                    if (attemptTicks > MAX_ATTEMPT) {
+                        phase = Phase.RETREATING;
+                        phaseTicks = 0;
+                        attemptTicks = 0;
+                        hasAttacked = false; // 标记为未攻击，但已强制撤回
+                    }
+                } else {
+                    // ===== 攻击成功后，等待延迟再撤回 =====
+                    phaseTicks++;
+                    if (phaseTicks > params.getAttackDelay()) {
+                        phase = Phase.RETREATING;
+                        phaseTicks = 0;
+                        attemptTicks = 0;
+                    }
                 }
                 break;
 
             case RETREATING:
                 double distToOwner = doll.distanceTo(owner);
-                if (distToOwner > 3.0) {
-                    // 使用跟随速度的1.2倍，目标距离1.5格
-                    doll.followOwner(owner, 1.2, 1.5);
+                if (distToOwner > retreatThreshold) {
+                    doll.followOwner(owner, retreatSpeed, holdDistance);
                 } else {
                     phase = Phase.WAITING;
                     phaseTicks = 0;
-                    waitDuration = 40 + RANDOM.nextInt(20);
+                    waitDuration = waitDurationBase + RANDOM.nextInt(20);
                 }
                 break;
 
             case WAITING:
-                // 等待 2-3 秒
                 if (phaseTicks < waitDuration) {
-                    // 动态跟随玩家，而不是固定在某个点
-                    doll.followOwner(owner, 0.8, 1.0);
+                    doll.followOwner(owner, waitSpeed, waitDistance);
                     phaseTicks++;
                 } else {
-                    // 重置循环
                     phase = Phase.CHARGING;
                     phaseTicks = 0;
                 }
@@ -109,12 +150,20 @@ public class VanguardStrategy implements ICombatStrategy {
         return phase == Phase.CHARGING || phase == Phase.ATTACKING;
     }
 
-    // 重置策略状态
     @Override
     public void reset() {
         this.phase = Phase.CHARGING;
         this.phaseTicks = 0;
         this.hasAttacked = false;
         this.waitDuration = 40 + RANDOM.nextInt(20);
+        this.attackCooldown = 0;
+        this.attemptTicks = 0;
+    }
+
+    private void refreshWeaponMode(DollEntity doll) {
+        WeaponType current = doll.getDollData().getWeaponType();
+        if (current == cachedWeapon) return;
+        cachedWeapon = current;
+        isRanged = (current == WeaponType.BOW || current == WeaponType.CROSSBOW || current == WeaponType.TRIDENT);
     }
 }

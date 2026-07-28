@@ -2,6 +2,7 @@ package org.aliceGrimoire.alicegrimoire.entity.doll.state;
 
 import net.minecraft.world.entity.LivingEntity;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
+import org.aliceGrimoire.alicegrimoire.entity.doll.data.CombatParameters;
 import org.aliceGrimoire.alicegrimoire.entity.doll.util.DollCollisionHelper;
 import org.slf4j.Logger;
 
@@ -43,7 +44,7 @@ public class DollStateManager {
         //                 ", hasTarget: " + (doll.getTarget() != null) +
         //                 ", isTethered: " + doll.isTethered() +
         //                 ", isPlayerMoving: " + doll.isPlayerActivelyMoving());
-             
+        //     
         if (isTickRunning) {
             return; // 防止递归
         }
@@ -100,7 +101,9 @@ public class DollStateManager {
                 if (!isEnraged || !hasValidTarget) {
                     doll.setEnraged(false); // 清除激怒和指定目标
                     setState(DollState.RECOVERING);
-                    recoveryTicks = 60;   // 3秒冷却
+                    // 冷却时间由配置决定
+                    CombatParameters params = doll.getDollData().getCombatParams();
+                    recoveryTicks = params.getRecoveryDuration();   // 3秒冷却
                 }
                 // 额外：如果拴绳被阻挡超过3秒，自动解除激怒（由外部触发 setEnraged(false)）
                 // 此处检测到阻塞时间过长，主动解除激怒（但由外部调用，我们在这里仅标记）
@@ -161,7 +164,8 @@ public class DollStateManager {
 
         // 状态进入时的特殊处理
         if (newState == DollState.RECOVERING) {
-            recoveryTicks = 60;      // 进入恢复状态即开始冷却
+            CombatParameters params = doll.getDollData().getCombatParams();
+            recoveryTicks = params.getRecoveryDuration();
         }
     }
 

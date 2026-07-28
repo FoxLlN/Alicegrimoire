@@ -8,36 +8,40 @@ import org.aliceGrimoire.alicegrimoire.entity.doll.data.CombatParameters;
 
 /**
  * 守御策略：持盾保护玩家
- * - 始终在玩家 4 格半径内游荡
+ * - 始终在玩家 guardRadius 半径内游荡
  * - 举盾面对目标
  * - 玩家受伤时瞬移至攻击者与玩家之间
- * - 受攻击后破盾 5 秒（斧头攻击额外延长）
+ * - 受攻击后破盾 shieldDisableTime 秒（斧头攻击额外延长）
  */
 public class DefenderStrategy implements ICombatStrategy {
-    private static final double GUARD_RADIUS = 4.0;
-    private static final int SHIELD_DISABLE_TIME = 100; // 5 秒破盾
     
     @Override
     public void tick(DollEntity doll, LivingEntity target, LivingEntity owner) {
         if (owner == null) return;
+
+        CombatParameters params = doll.getDollData().getCombatParams();
+        double guardSpeed = params.getGuardSpeed();
+        double guardRadius = params.getGuardRadius();
+        double holdDistance = params.getHoldDistance();
+        int shieldDisableTime = params.getShieldDisableTime();
 
         // 1. 面向最近的目标（如果存在）
         if (target != null && doll.distanceTo(target) <= 16.0 && doll.getSensing().hasLineOfSight(target)) {
             doll.getLookControl().setLookAt(target, 30.0F, 30.0F);
         }
 
-        // 2. 保持在玩家 4 格半径内
+        // 2. 保持在玩家 guardRadius 半径内
         double distToOwner = doll.distanceTo(owner);
-        if (distToOwner > GUARD_RADIUS) {
+        if (distToOwner > guardRadius) {
             // 靠近玩家
             Vec3 dir = owner.position().subtract(doll.position()).normalize();
-            Vec3 targetPos = owner.position().subtract(dir.scale(Math.min(2.0, distToOwner - GUARD_RADIUS)));
-            doll.getMoveControl().setWantedPosition(targetPos.x, owner.getY() + 1.5, targetPos.z, 1.0);
+            Vec3 targetPos = owner.position().subtract(dir.scale(Math.min(holdDistance, distToOwner - guardRadius)));
+            doll.getMoveControl().setWantedPosition(targetPos.x, owner.getY() + 1.5, targetPos.z, guardSpeed);
         } else if (target != null) {
             // 在玩家身边时，调整到玩家与目标之间（面朝目标）
             Vec3 dir = target.position().subtract(owner.position()).normalize();
             Vec3 targetPos = owner.position().add(dir.scale(1.5));
-            doll.getMoveControl().setWantedPosition(targetPos.x, owner.getY() + 1.5, targetPos.z, 0.8);
+            doll.getMoveControl().setWantedPosition(targetPos.x, owner.getY() + 1.5, targetPos.z, guardSpeed);
         }
 
         // 3. 始终举盾（由 DollEntity.isBlocking() 控制）

@@ -31,6 +31,7 @@ public class DollDataManager {
         this.data = data;
         applyDataToEntity();
         refreshStrategy();
+        doll.syncEquipmentToClient();
     }
     
     // ========== 应用数据到实体 ==========
@@ -57,7 +58,6 @@ public class DollDataManager {
     // ========== 策略工厂（核心） ==========
     private ICombatStrategy createStrategy() {
         DollJobType job = data.getJobType();
-        WeaponType weapon = data.getWeaponType();
         
         return switch (job) {
             // === 标准AI ===
@@ -70,13 +70,7 @@ public class DollDataManager {
             case DEFENDER -> new DefenderStrategy();
             
             // === 射手AI（远离+走位+射击） ===
-            case SHARPSHOOTER -> {
-                if (weapon == WeaponType.TRIDENT) {
-                    yield new SharpshooterTridentStrategy(); // 三叉戟投射（像溺尸）
-                } else {
-                    yield new SharpshooterStrategy();        // 弓/弩射击（不耗箭）
-                }
-            }
+            case SHARPSHOOTER -> new SharpshooterStrategy();   
             
             // === 游击AI（一击脱离） ===
             case VANGUARD -> new VanguardStrategy();
@@ -133,15 +127,34 @@ public class DollDataManager {
     public void addTetherRange(double amount) {
         data.setTetherRange(Math.max(1, data.getTetherRange() + amount));
     }
-    
-    public void addAttackSpeed(int amount) {
-        data.setAttackCooldown(Math.max(1, data.getAttackCooldown() - amount));
+
+    // ---------- 物品栏操作 ----------
+    public ItemStack getItem(int slot) {
+        return data.getItem(slot);
     }
-    
-    // ========== 武器设置 ==========
+
+    public void setItem(int slot, ItemStack stack) {
+        data.setItem(slot, stack);
+        if (slot == DollSlots.MAIN_HAND) {
+            refreshStrategy();
+        }
+        // 同步到客户端
+        doll.syncEquipmentToClient();
+    }
+
+    // ---------- 武器设置 ----------
     public void setWeapon(ItemStack weapon) {
-        data.setWeapon(weapon);
-        refreshStrategy(); // 武器改变可能影响策略
+        setItem(DollSlots.MAIN_HAND, weapon);
+    }
+
+    // 新增获取副手的方法
+    public ItemStack getOffHand() {
+        return data.getOffHand();
+    }
+
+    // ---------- 武器类型获取（直接透传） ----------
+    public WeaponType getWeaponType() {
+        return data.getWeaponType();
     }
     
     // ========== NBT 持久化 ==========
@@ -153,5 +166,6 @@ public class DollDataManager {
         data.load(tag, registries);
         applyDataToEntity();
         refreshStrategy();
+        doll.syncEquipmentToClient();
     }
 }

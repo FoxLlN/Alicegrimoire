@@ -3,7 +3,6 @@ package org.aliceGrimoire.alicegrimoire.entity.doll.data;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.item.*;
-import org.aliceGrimoire.alicegrimoire.Alicegrimoire;
 
 /**
  * 人偶属性数据
@@ -26,18 +25,11 @@ public class DollData {
     
     // ========== 移动属性 ==========
     private double tetherRange;           // 拴绳范围 (活动半径)
-    private double attackRange;           // 攻击距离 (近战)
-    private double attackVerticalRange;   // 攻击垂直容差
-    private int attackCooldown;           // 攻击冷却 (tick)
-    
-    // ========== 飞行属性 ==========
     private double flightSpeed;           // 飞行速度 (整体速度倍率)
     private double turnSpeed;             // 转向速度
     
     // ========== 职业/武器 ==========
     private DollJobType jobType;          // 职业类型
-    private ItemStack weapon;             // 手持武器
-    private WeaponType weaponType;        // 武器类型 (根据武器自动判断)
     
     // ========== 状态标志 ==========
     private boolean isBroken;             // 是否破损
@@ -51,6 +43,9 @@ public class DollData {
     // ========== 自定义扩展 ==========
     private CompoundTag customData;       // 自定义数据 (未来扩展)
 
+    // ========== 背包装备 ==========
+    private ItemStack[] inventory = new ItemStack[DollSlots.INVENTORY_SIZE];
+
     // ========== 战斗参数 ==========
     private CombatParameters combatParams = new CombatParameters();
     
@@ -61,7 +56,10 @@ public class DollData {
     
     public DollData(DollDataTemplate template) {
         applyTemplate(template);
-        this.weapon = ItemStack.EMPTY;
+        // 初始化所有槽位为空
+        for (int i = 0; i < inventory.length; i++) {
+            inventory[i] = ItemStack.EMPTY;
+        }
         this.customData = new CompoundTag();
     }
     
@@ -76,9 +74,6 @@ public class DollData {
         this.followSpeedMultiplier = template.followSpeedMultiplier();
         this.strikeSpeedMultiplier = template.strikeSpeedMultiplier();
         this.tetherRange = template.tetherRange();
-        this.attackRange = template.attackRange();
-        this.attackVerticalRange = template.attackVerticalRange();
-        this.attackCooldown = template.attackCooldown();
         this.flightSpeed = template.flightSpeed();
         this.turnSpeed = template.turnSpeed();
         this.jobType = template.jobType();
@@ -87,6 +82,8 @@ public class DollData {
         this.eyeColor = template.eyeColor();
         this.ribbonColor = template.ribbonColor();
         this.isBroken = false;
+        // ===== 复制战斗参数 =====
+        this.combatParams = template.combatParams().copy();
     }
     
     // ========== Getter / Setter ==========
@@ -109,12 +106,6 @@ public class DollData {
     
     public double getTetherRange() { return tetherRange; }
     public void setTetherRange(double range) { this.tetherRange = range; }
-    public double getAttackRange() { return attackRange; }
-    public void setAttackRange(double range) { this.attackRange = range; }
-    public double getAttackVerticalRange() { return attackVerticalRange; }
-    public void setAttackVerticalRange(double range) { this.attackVerticalRange = range; }
-    public int getAttackCooldown() { return attackCooldown; }
-    public void setAttackCooldown(int cooldown) { this.attackCooldown = cooldown; }
     
     public double getFlightSpeed() { return flightSpeed; }
     public void setFlightSpeed(double speed) { this.flightSpeed = speed; }
@@ -122,12 +113,33 @@ public class DollData {
     
     public DollJobType getJobType() { return jobType; }
     public void setJobType(DollJobType jobType) { this.jobType = jobType; }
-    public ItemStack getWeapon() { return weapon; }
-    public void setWeapon(ItemStack weapon) { 
-        this.weapon = weapon;
-        this.weaponType = detectWeaponType(weapon);
+    
+    public ItemStack getItem(int slot) {
+        if (!DollSlots.isValidSlot(slot)) return ItemStack.EMPTY;
+        return inventory[slot];
     }
-    public WeaponType getWeaponType() { return weaponType; }
+
+    public void setItem(int slot, ItemStack stack) {
+        if (!DollSlots.isValidSlot(slot)) return;
+        inventory[slot] = stack == null ? ItemStack.EMPTY : stack;
+        // 如果设置的是主手，武器类型会自动更新（通过 getWeaponType()）
+    }
+
+    public ItemStack getWeapon() {
+        return getItem(DollSlots.MAIN_HAND);
+    }
+
+    public void setWeapon(ItemStack weapon) {
+        setItem(DollSlots.MAIN_HAND, weapon);
+    }
+
+    public ItemStack getOffHand() {
+        return getItem(DollSlots.OFF_HAND);
+    }
+
+    public WeaponType getWeaponType() {
+        return WeaponType.fromItemStack(getWeapon());
+    }
     
     public boolean isBroken() { return isBroken; }
     public void setBroken(boolean broken) { this.isBroken = broken; }
@@ -145,28 +157,11 @@ public class DollData {
     public void setCombatParams(CombatParameters combatParams) { 
         this.combatParams = combatParams; 
     }
-
-    // ========== 快捷访问方法（供策略类使用） ==========
-    public double getStopDistance() { return combatParams.getStopDistance(); }
-    public int getChargeDuration() { return combatParams.getChargeDuration(); }
-    public double getStickRange() { return combatParams.getStickRange(); }
-    public double getStickAttackRange() { return combatParams.getStickAttackRange(); }
-    public double getShootRange() { return combatParams.getShootRange(); }
-    public int getShootCooldown() { return combatParams.getShootCooldown(); }
-    public double getMinDistance() { return combatParams.getMinDistance(); }
-    public double getMaxDistance() { return combatParams.getMaxDistance(); }
-    public int getStrafeInterval() { return combatParams.getStrafeInterval(); }
-    public int getSharpshooterCooldown() { return combatParams.getSharpshooterCooldown(); }
-    public double getTridentMinDistance() { return combatParams.getTridentMinDistance(); }
-    public double getTridentMaxDistance() { return combatParams.getTridentMaxDistance(); }
-    public int getTridentCooldown() { return combatParams.getTridentCooldown(); }
-    public int getVanguardChargeDuration() { return combatParams.getVanguardChargeDuration(); }
-    public double getAttackDistance() { return combatParams.getAttackDistance(); }
-    public int getLancerChargeDelay() { return combatParams.getLancerChargeDelay(); }
-    public int getLancerChargeDuration() { return combatParams.getLancerChargeDuration(); }
-    public double getLancerChargeSpeed() { return combatParams.getLancerChargeSpeed(); }
-    public DamageReactionType getReactionType() { return combatParams.getReactionType(); }
     
+    public ItemStack[] getInventory() {
+        return inventory;
+    }
+
     // ========== 辅助方法 ==========
     private WeaponType detectWeaponType(ItemStack stack) {
         return WeaponType.fromItemStack(stack);
@@ -184,9 +179,6 @@ public class DollData {
         tag.putDouble("FollowSpeedMultiplier", followSpeedMultiplier);
         tag.putDouble("StrikeSpeedMultiplier", strikeSpeedMultiplier);
         tag.putDouble("TetherRange", tetherRange);
-        tag.putDouble("AttackRange", attackRange);
-        tag.putDouble("AttackVerticalRange", attackVerticalRange);
-        tag.putInt("AttackCooldown", attackCooldown);
         tag.putDouble("FlightSpeed", flightSpeed);
         tag.putDouble("TurnSpeed", turnSpeed);
         tag.putString("JobType", jobType.name());
@@ -195,10 +187,16 @@ public class DollData {
         tag.putInt("HairColor", hairColor);
         tag.putInt("EyeColor", eyeColor);
         tag.putInt("RibbonColor", ribbonColor);
-        if (!weapon.isEmpty()) {
-            tag.put("Weapon", weapon.save(registries));
-        }
         tag.put("CustomData", customData);
+
+        CompoundTag invTag = new CompoundTag();
+        for (int i = 0; i < inventory.length; i++) {
+            if (!inventory[i].isEmpty()) {
+                invTag.put("Slot" + i, inventory[i].save(registries));
+            }
+        }
+        tag.put("Inventory", invTag);
+
         return tag;
     }
     
@@ -212,9 +210,6 @@ public class DollData {
         this.followSpeedMultiplier = tag.getDouble("FollowSpeedMultiplier");
         this.strikeSpeedMultiplier = tag.getDouble("StrikeSpeedMultiplier");
         this.tetherRange = tag.getDouble("TetherRange");
-        this.attackRange = tag.getDouble("AttackRange");
-        this.attackVerticalRange = tag.getDouble("AttackVerticalRange");
-        this.attackCooldown = tag.getInt("AttackCooldown");
         this.flightSpeed = tag.getDouble("FlightSpeed");
         this.turnSpeed = tag.getDouble("TurnSpeed");
         this.jobType = DollJobType.valueOf(tag.getString("JobType"));
@@ -223,10 +218,17 @@ public class DollData {
         this.hairColor = tag.getInt("HairColor");
         this.eyeColor = tag.getInt("EyeColor");
         this.ribbonColor = tag.getInt("RibbonColor");
-        if (tag.contains("Weapon")) {
-            this.weapon = ItemStack.parse(registries, tag.getCompound("Weapon")).orElse(ItemStack.EMPTY);
-            this.weaponType = detectWeaponType(this.weapon);
+        // 加载物品栏
+        if (tag.contains("Inventory")) {
+            CompoundTag invTag = tag.getCompound("Inventory");
+            for (int i = 0; i < inventory.length; i++) {
+                if (invTag.contains("Slot" + i)) {
+                    inventory[i] = ItemStack.parse(registries, invTag.getCompound("Slot" + i))
+                            .orElse(ItemStack.EMPTY);
+                }
+            }
         }
+
         this.customData = tag.getCompound("CustomData");
     }
     
@@ -236,13 +238,15 @@ public class DollData {
         copy.applyTemplate(new DollDataTemplate(
             maxHealth, damage, armor, armorToughness, knockbackResistance,
             wanderSpeed, followSpeedMultiplier, strikeSpeedMultiplier,
-            tetherRange, attackRange, attackVerticalRange, attackCooldown,
-            flightSpeed, turnSpeed, jobType, hasShield,
+            tetherRange, flightSpeed, turnSpeed, 
+            jobType, hasShield,
             hairColor, eyeColor, ribbonColor,
-            combatParams.copy()
+            combatParams.copy() // 传递副本
         ));
-        if (!weapon.isEmpty()) {
-            copy.setWeapon(weapon.copy());
+        for (int i = 0; i < inventory.length; i++) {
+            if (!inventory[i].isEmpty()) {
+                copy.inventory[i] = inventory[i].copy();
+            }
         }
         copy.isBroken = this.isBroken;
         copy.customData = this.customData.copy();
