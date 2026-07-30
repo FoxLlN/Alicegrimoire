@@ -48,11 +48,12 @@ public class CombatParameters {
     // 二、远程专用参数（射手职业 / 近卫使用远程武器时）
     // ============================================================
     
-    private double rangedMinDistance = 8.0;     // 远程最小攻击距离（格）
-    private double rangedMaxDistance = 16.0;    // 远程最大攻击距离（格）
+    private double rangedMinDistance = 5.0;     // 远程最小攻击距离（格）
+    private double rangedMaxDistance = 10.0;    // 远程最大攻击距离（格）
     private int rangedCooldown = 25;            // 远程射击冷却（tick）
-    private int strafeInterval = 40;            // 走位切换间隔（tick）
-    
+    private double riptideMultiplier = 1.5;     // 每级激流附魔增加的速度倍率（基础1.0 + 等级 * 此值）
+    private double strafeMultiplier = 0.3;      // 游走速度倍率，0.3 为标准，可调大或调小
+
     // ============================================================
     // 三、守御专用参数
     // ============================================================
@@ -124,9 +125,12 @@ public class CombatParameters {
     public int getRangedCooldown() { return rangedCooldown; }
     public void setRangedCooldown(int rangedCooldown) { this.rangedCooldown = rangedCooldown; }
     
-    public int getStrafeInterval() { return strafeInterval; }
-    public void setStrafeInterval(int strafeInterval) { this.strafeInterval = strafeInterval; }
-    
+    public double getRiptideMultiplier() { return riptideMultiplier; }
+    public void setRiptideMultiplier(double riptideMultiplier) { this.riptideMultiplier = riptideMultiplier; }
+
+    public double getStrafeMultiplier() { return strafeMultiplier; }
+    public void setStrafeMultiplier(double strafeMultiplier) { this.strafeMultiplier = strafeMultiplier; }
+
     // ---------- 守御 ----------
     public double getGuardSpeed() { return guardSpeed; }
     public void setGuardSpeed(double guardSpeed) { this.guardSpeed = guardSpeed; }
@@ -166,7 +170,8 @@ public class CombatParameters {
         tag.putDouble("RangedMinDistance", rangedMinDistance);
         tag.putDouble("RangedMaxDistance", rangedMaxDistance);
         tag.putInt("RangedCooldown", rangedCooldown);
-        tag.putInt("StrafeInterval", strafeInterval);
+        tag.putDouble("RiptideMultiplier", riptideMultiplier);
+        tag.putDouble("StrafeMultiplier", strafeMultiplier);
         
         // 守御
         tag.putDouble("GuardRadius", guardRadius);
@@ -197,7 +202,8 @@ public class CombatParameters {
         this.rangedMinDistance = tag.getDouble("RangedMinDistance");
         this.rangedMaxDistance = tag.getDouble("RangedMaxDistance");
         this.rangedCooldown = tag.getInt("RangedCooldown");
-        this.strafeInterval = tag.getInt("StrafeInterval");
+        this.riptideMultiplier = tag.getDouble("RiptideMultiplier");
+        this.strafeMultiplier = tag.getDouble("StrafeMultiplier");
         
         // 守御
         this.guardRadius = tag.getDouble("GuardRadius");
@@ -236,7 +242,8 @@ public class CombatParameters {
         copy.rangedMinDistance = this.rangedMinDistance;
         copy.rangedMaxDistance = this.rangedMaxDistance;
         copy.rangedCooldown = this.rangedCooldown;
-        copy.strafeInterval = this.strafeInterval;
+        copy.riptideMultiplier = this.riptideMultiplier;
+        copy.strafeMultiplier = this.strafeMultiplier;
         // 守御
         copy.guardRadius = this.guardRadius;
         copy.shieldDisableTime = this.shieldDisableTime;

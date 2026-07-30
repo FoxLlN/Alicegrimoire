@@ -110,24 +110,6 @@ public record DollDataTemplate(
      */
     public static CombatParameters createDefault() {
         CombatParameters p = new CombatParameters();
-        p.setAttackRange(2.0);
-        p.setAttackVerticalRange(3.0);
-        p.setAttackCooldown(10);
-        p.setHoldDistance(1.0);
-        p.setRetreatThreshold(3.0);
-        p.setWaitDistance(2.0);
-        p.setChargeSpeed(1.2);
-        p.setRetreatSpeed(1.2);
-        p.setWaitSpeed(0.4);
-        p.setChargeDuration(15);
-        p.setWaitDuration(40);
-        p.setRecoveryDuration(60);
-        p.setRangedMinDistance(8.0);
-        p.setRangedMaxDistance(16.0);
-        p.setRangedCooldown(25);
-        p.setStrafeInterval(40);
-        p.setGuardRadius(4.0);
-        p.setShieldDisableTime(100);
         return p;
     }
     
@@ -146,6 +128,7 @@ public record DollDataTemplate(
         p.setWaitDuration(40);
         p.setRangedMinDistance(2.0);
         p.setRangedMaxDistance(8.0);
+        p.setRiptideMultiplier(1.5);
         return p;
     }
     
@@ -155,7 +138,7 @@ public record DollDataTemplate(
     public static CombatParameters createDefender() {
         CombatParameters p = new CombatParameters();
         p.setAttackRange(1.5);
-        p.setAttackCooldown(12);
+        p.setAttackCooldown(10);
         p.setHoldDistance(2.0);
         p.setWaitSpeed(0.3);
         p.setRecoveryDuration(80);
@@ -179,10 +162,10 @@ public record DollDataTemplate(
         p.setWaitSpeed(0.3);
         p.setChargeDuration(10);
         p.setWaitDuration(40);
-        p.setRangedMinDistance(8.0);
-        p.setRangedMaxDistance(16.0);
+        p.setRangedMinDistance(5.0);
+        p.setRangedMaxDistance(12.0);
         p.setRangedCooldown(25);
-        p.setStrafeInterval(40);
+        p.setStrafeMultiplier(0.3);
         return p;
     }
     
@@ -202,6 +185,7 @@ public record DollDataTemplate(
         p.setWaitDuration(40);
         p.setRangedMinDistance(2.0);
         p.setRangedMaxDistance(8.0);
+        p.setRiptideMultiplier(1.5);
         return p;
     }
 }

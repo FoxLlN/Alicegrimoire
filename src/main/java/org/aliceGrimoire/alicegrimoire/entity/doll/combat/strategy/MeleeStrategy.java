@@ -33,7 +33,7 @@ public class MeleeStrategy implements ICombatStrategy {
         double holdDistance = params.getHoldDistance();
         int cooldownMax = params.getAttackCooldown();
         
-        LOGGER.info("默认攻击距离为" + attackRange);
+        // LOGGER.info("默认攻击距离为" + attackRange);
         
         // ---- 计算距离 ----
         double dx = target.getX() - doll.getX();
@@ -108,6 +108,14 @@ public class MeleeStrategy implements ICombatStrategy {
             
             attackCooldown = cooldownMax; // 0.5 秒冷却
         }
+
+        
+        // ===== 强制面向目标 =====
+        double dx2 = target.getX() - doll.getX();
+        double dz2 = target.getZ() - doll.getZ();
+        float yaw = (float) (Math.atan2(-dx2, dz2) * 180.0 / Math.PI);
+        doll.setYRot(yaw);
+        doll.yBodyRot = doll.getYRot();
     }
 
     @Override

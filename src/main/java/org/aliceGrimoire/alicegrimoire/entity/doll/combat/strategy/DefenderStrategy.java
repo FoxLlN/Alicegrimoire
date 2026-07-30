@@ -6,15 +6,12 @@ import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.combat.ICombatStrategy;
 import org.aliceGrimoire.alicegrimoire.entity.doll.data.CombatParameters;
 
-/**
- * 守御策略：持盾保护玩家
- * - 始终在玩家 guardRadius 半径内游荡
- * - 举盾面对目标
- * - 玩家受伤时瞬移至攻击者与玩家之间
- * - 受攻击后破盾 shieldDisableTime 秒（斧头攻击额外延长）
- */
 public class DefenderStrategy implements ICombatStrategy {
-    
+
+    private Vec3 lastTargetPos = null;
+    private int moveCooldown = 0;
+    private int attackCooldown = 0;
+
     @Override
     public void tick(DollEntity doll, LivingEntity target, LivingEntity owner) {
         if (owner == null) return;
@@ -23,33 +20,82 @@ public class DefenderStrategy implements ICombatStrategy {
         double guardSpeed = params.getGuardSpeed();
         double guardRadius = params.getGuardRadius();
         double holdDistance = params.getHoldDistance();
-        int shieldDisableTime = params.getShieldDisableTime();
 
-        // 1. 面向最近的目标（如果存在）
-        if (target != null && doll.distanceTo(target) <= 16.0 && doll.getSensing().hasLineOfSight(target)) {
-            doll.getLookControl().setLookAt(target, 30.0F, 30.0F);
+        // ===== 从战斗参数读取近战配置 =====
+        double attackRange = params.getAttackRange();
+        double attackVerticalRange = params.getAttackVerticalRange();
+        int attackCooldownMax = params.getAttackCooldown();
+
+        // 直接使用传入的 target（由 DollEntity 自动索敌维护）
+        LivingEntity faceTarget = target;
+
+        // 2. 面向目标
+        if (faceTarget != null && doll.distanceTo(faceTarget) <= 16.0 && doll.getSensing().hasLineOfSight(faceTarget)) {
+            doll.getLookControl().setLookAt(faceTarget, 30.0F, 30.0F);
         }
 
-        // 2. 保持在玩家 guardRadius 半径内
+        // 3. 移动逻辑：保持在玩家 guardRadius 半径内
         double distToOwner = doll.distanceTo(owner);
+        Vec3 moveTarget = null;
+
         if (distToOwner > guardRadius) {
-            // 靠近玩家
             Vec3 dir = owner.position().subtract(doll.position()).normalize();
-            Vec3 targetPos = owner.position().subtract(dir.scale(Math.min(holdDistance, distToOwner - guardRadius)));
-            doll.getMoveControl().setWantedPosition(targetPos.x, owner.getY() + 1.5, targetPos.z, guardSpeed);
-        } else if (target != null) {
-            // 在玩家身边时，调整到玩家与目标之间（面朝目标）
-            Vec3 dir = target.position().subtract(owner.position()).normalize();
-            Vec3 targetPos = owner.position().add(dir.scale(1.5));
-            doll.getMoveControl().setWantedPosition(targetPos.x, owner.getY() + 1.5, targetPos.z, guardSpeed);
+            double step = Math.min(holdDistance, distToOwner - guardRadius);
+            moveTarget = owner.position().subtract(dir.scale(step));
+        } else if (faceTarget != null && distToOwner > guardRadius * 0.5) {
+            Vec3 dir = faceTarget.position().subtract(owner.position()).normalize();
+            moveTarget = owner.position().add(dir.scale(1.5));
         }
 
-        // 3. 始终举盾（由 DollEntity.isBlocking() 控制）
-        // 状态由 DollEntity 中的 shieldDisableTicks 控制
+        if (moveTarget != null) {
+            moveTarget = new Vec3(moveTarget.x, owner.getY() + 1.5, moveTarget.z);
+            if (lastTargetPos == null || moveTarget.distanceToSqr(lastTargetPos) > 0.25) {
+                lastTargetPos = moveTarget;
+                moveCooldown = 0;
+            }
+            if (moveCooldown <= 0) {
+                doll.getMoveControl().setWantedPosition(moveTarget.x, moveTarget.y, moveTarget.z, guardSpeed);
+                moveCooldown = 2;
+            } else {
+                moveCooldown--;
+            }
+        } else {
+            lastTargetPos = null;
+        }
+
+        // ===== 4. 近战反击：敌人碰到人偶时自动攻击（含垂直判定） =====
+        if (faceTarget != null) {
+            // ---- 计算水平距离 ----
+            double dx = faceTarget.getX() - doll.getX();
+            double dz = faceTarget.getZ() - doll.getZ();
+            double horizontalDist = Math.sqrt(dx * dx + dz * dz);
+
+            // ---- 计算垂直距离 ----
+            double targetHeight = faceTarget.getEyeHeight() * 0.6;
+            double targetY = faceTarget.getY() + targetHeight;
+            double dy = targetY - doll.getY();
+
+            boolean horizontalInRange = horizontalDist <= attackRange;
+            boolean verticalInRange = Math.abs(dy) <= attackVerticalRange;
+            boolean canSee = doll.getSensing().hasLineOfSight(faceTarget);
+
+            if (horizontalInRange && verticalInRange && canSee) {
+                if (attackCooldown > 0) {
+                    attackCooldown--;
+                } else if (!doll.isSameOwner(faceTarget)) {
+                    doll.doHurtTarget(faceTarget);
+                    attackCooldown = attackCooldownMax;
+                }
+            } else {
+                if (attackCooldown > 0) {
+                    attackCooldown--;
+                }
+            }
+        }
     }
 
     @Override
     public boolean isAttacking() {
-        return false; // 守御不主动攻击
+        return attackCooldown > 0 && attackCooldown < 8;
     }
 }

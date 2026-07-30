@@ -1,14 +1,20 @@
 package org.aliceGrimoire.alicegrimoire.entity.doll.combat.strategy;
 
+import net.minecraft.core.Holder;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
+import net.minecraft.world.item.enchantment.Enchantments;
+import net.minecraft.world.item.enchantment.ItemEnchantments;
+
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.combat.ICombatStrategy;
 import org.aliceGrimoire.alicegrimoire.entity.doll.combat.strategy.reaction.IDamageReactionStrategy;
 import org.aliceGrimoire.alicegrimoire.entity.doll.combat.strategy.reaction.ReactionStrategyRegistry;
 import org.aliceGrimoire.alicegrimoire.entity.doll.data.CombatParameters;
 import org.aliceGrimoire.alicegrimoire.entity.doll.data.WeaponType;
-
 import com.mojang.logging.LogUtils;
 import org.slf4j.Logger;
 
@@ -19,7 +25,7 @@ import java.util.Random;
  * 根据武器类型自动适配战斗行为：
  * - 近战武器（剑/矛）：近战攻击
  * - 远程武器（弓/弩）：抵近射击
- * - 三叉戟：激流冲锋
+ * - 三叉戟：普通三叉戟使用移动控制冲锋，附魔激流的三叉戟使用高速冲刺
  * 
  * 步骤1: 冲锋 → 步骤2: 黏住连击 → 步骤3: 撤回玩家身边 → 步骤4: 等待
  * 
@@ -66,9 +72,6 @@ public class GuardStrategy implements ICombatStrategy {
         double retreatThreshold = params.getRetreatThreshold();
         double rangedMinDistance = params.getRangedMinDistance();
 
-        //LOGGER.info("[近卫数据]chargeDuration: {}, holdDistance: {}, retreatThreshold: {}, rangedMinDistance: {}", 
-        //            chargeDuration, holdDistance, retreatThreshold, rangedMinDistance);
-
         // 获取伤害反应策略
         if (reactionStrategy == null) {
             reactionStrategy = ReactionStrategyRegistry.create(params.getReactionType());
@@ -95,7 +98,8 @@ public class GuardStrategy implements ICombatStrategy {
         // ===== 状态机主循环 =====
         switch (phase) {
             case CHARGING:
-                handleCharging(doll, target, chargeDuration, holdDistance, params.getChargeSpeed(), rangedMinDistance);
+                handleCharging(doll, target, chargeDuration, holdDistance, params.getChargeSpeed(), 
+                               rangedMinDistance, params.getRiptideMultiplier());
                 break;
 
             case STICKING:
@@ -103,34 +107,83 @@ public class GuardStrategy implements ICombatStrategy {
                 break;
 
             case RETREATING:
-                handleRetreating(doll, owner, retreatThreshold, params.getRetreatSpeed(), holdDistance, params.getWaitDuration());
+                handleRetreating(doll, owner, retreatThreshold, params.getRetreatSpeed(), 
+                                 holdDistance, params.getWaitDuration());
                 break;
 
             case WAITING:
                 handleWaiting(doll, owner, params.getWaitSpeed(), params.getWaitDistance());
                 break;
         }
+        // ===== 强制面向目标 =====
+        double dx = target.getX() - doll.getX();
+        double dz = target.getZ() - doll.getZ();
+        float yaw = (float) (Math.atan2(-dx, dz) * 180.0 / Math.PI);
+        doll.setYRot(yaw);
+        doll.yBodyRot = doll.getYRot();
     }
+
 
     // ========== 各阶段处理私有方法 ==========
 
-    private void handleCharging(DollEntity doll, LivingEntity target, int chargeDuration, 
-                                double holdDistance, double chargeSpeed, double rangedMinDistance) {
+    /**
+     * 冲锋阶段处理
+     * - 三叉戟（附魔激流）：高速冲刺（直接设置速度）
+     * - 其他所有武器（近战/远程/普通三叉戟）：移动控制冲锋
+     */
+    private void handleCharging(DollEntity doll, LivingEntity target, int chargeDuration,
+                            double holdDistance, double chargeSpeed, double rangedMinDistance,
+                            double riptideMultiplier) {
         if (phaseTicks < chargeDuration) {
+            boolean isRiptideCharging = false;
+
+            // ===== 检测激流冲刺（仅三叉戟 + 激流附魔） =====
             if (isTrident) {
-                // 三叉戟：激流冲锋（直接设置速度）
-                Vec3 dir = target.position().subtract(doll.position()).normalize();
-                doll.setDeltaMovement(dir.scale(chargeSpeed));
-            } else {
-                // 近战/远程：移动控制冲锋
-                Vec3 dir = target.position().subtract(doll.position()).normalize();
-                double distance = holdDistance;
-                if (isRanged) {
-                    distance = rangedMinDistance;
+                ItemStack mainHand = doll.getDollData().getWeapon();
+                ItemEnchantments enchantments = mainHand.get(DataComponents.ENCHANTMENTS);
+                int riptideLevel = 0;
+                if (enchantments != null) {
+                    for (var entry : enchantments.entrySet()) {
+                        Holder<Enchantment> holder = entry.getKey();
+                        if (holder.unwrapKey().isPresent() &&
+                            holder.unwrapKey().get().equals(Enchantments.RIPTIDE)) {
+                            riptideLevel = entry.getValue();
+                            break;
+                        }
+                    }
                 }
+                if (riptideLevel > 0) {
+                    // ===== 激流冲刺：只在第一 tick 施加一次速度 =====
+                    if (phaseTicks == 0) {
+                        Vec3 dir = target.position().subtract(doll.position()).normalize();
+                        double speedMultiplier = 1.0 + riptideLevel * riptideMultiplier;
+                        speedMultiplier = Math.min(speedMultiplier, 6.0);
+                        doll.setDeltaMovement(dir.scale(chargeSpeed * speedMultiplier));
+                        // 朝目标方向
+                        doll.setYRot(-((float) Math.atan2(dir.x, dir.z)) * (180F / (float) Math.PI));
+                        doll.yBodyRot = doll.getYRot();
+                    }
+                    isRiptideCharging = true;
+
+                    // ===== 检测是否已经到达目标附近（提前结束冲锋） =====
+                    double dist = doll.distanceTo(target);
+                    // 如果距离小于黏住距离，立刻进入 STICKING
+                    if (dist <= holdDistance + 0.5) {
+                        phase = Phase.STICKING;
+                        phaseTicks = 0;
+                        return;
+                    }
+                }
+            }
+
+            // ===== 非激流冲刺：移动控制冲锋 =====
+            if (!isRiptideCharging) {
+                Vec3 dir = target.position().subtract(doll.position()).normalize();
+                double distance = isRanged ? rangedMinDistance : holdDistance;
                 Vec3 targetPos = target.position().subtract(dir.scale(distance));
                 doll.getMoveControl().setWantedPosition(targetPos.x, target.getY() + 0.5, targetPos.z, chargeSpeed);
             }
+
             phaseTicks++;
         } else {
             phase = Phase.STICKING;

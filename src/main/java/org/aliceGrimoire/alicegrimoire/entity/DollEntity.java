@@ -16,6 +16,7 @@ import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.Arrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.ShieldItem;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -140,9 +141,40 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                 }
             }
 
+            // ===== 守御人偶自动索敌与激怒 =====
+            if (this.getJobType() == DollJobType.DEFENDER) {
+                if (owner != null) {
+                    List<LivingEntity> enemies = owner.level().getEntitiesOfClass(
+                        LivingEntity.class,
+                        owner.getBoundingBox().inflate(8.0),
+                        e -> e != owner && e != this && e.isAlive() && owner.canAttack(e)
+                    );
+                    LivingEntity nearest = null;
+                    if (!enemies.isEmpty()) {
+                        nearest = enemies.stream()
+                            .min((a, b) -> Double.compare(a.distanceToSqr(owner), b.distanceToSqr(owner)))
+                            .orElse(null);
+                    }
+                    
+                    if (nearest != null) {
+                        if (this.getTarget() != nearest) {
+                            this.setTarget(nearest);
+                        }
+                        if (!this.isEnraged()) {
+                            this.setEnraged(true);
+                        }
+                    } else {
+                        if (this.isEnraged()) {
+                            this.setEnraged(false);
+                        }
+                        this.setTarget(null);
+                    }
+                }
+            }
+            
             // 3. 状态机更新
             stateManager.tick();
-
+            
             // 4. 移动控制
             movementHandler.tick();
 
@@ -173,11 +205,15 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                     }
                 }
             }
+
         }
 
         // 8. 人偶互相排斥
-        if (!this.level().isClientSide && this.noPhysics && this.tickCount % 2 == 0) {
+        if (!this.level().isClientSide && this.noPhysics) {
             applyRepulsion();
+        }
+        if (shieldDisableTicks > 0) {
+            shieldDisableTicks--;
         }
     }
 
@@ -200,20 +236,23 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
             double dy = this.getY() - other.getY();
             double dz = this.getZ() - other.getZ();
             double distSq = dx*dx + dy*dy + dz*dz;
-            if (distSq < 0.64 && distSq > 0.0001) { // 0.8格以内
-                double strength = 0.2 / (Math.sqrt(distSq) + 0.1);
-                repelX += dx * strength;
-                repelY += dy * strength;
-                repelZ += dz * strength;
+            if (distSq < 1.0 && distSq > 0.0001) { // 1.0格以内
+                double dist = Math.sqrt(distSq);
+                double strength = Math.min(0.3 / (dist + 0.1), 0.3);
+                double invDist = 1.0 / dist;
+                repelX += dx * invDist * strength;
+                repelY += dy * invDist * strength;
+                repelZ += dz * invDist * strength;
                 // 同步给对面施加反向力
-                other.applyRepulsionFrom(this, new Vec3(-dx * strength, -dy * strength, -dz * strength));
+                other.applyRepulsionFrom(this, new Vec3(-dx * invDist * strength, -dy * invDist * strength, -dz * invDist * strength));
             }
         }
         
         if (repelX != 0 || repelY != 0 || repelZ != 0) {
             Vec3 newPos = this.position().add(repelX, repelY, repelZ);
             this.moveTo(newPos.x, newPos.y, newPos.z);
-            this.setDeltaMovement(this.getDeltaMovement().add(repelX, repelY, repelZ));
+            // 轻微速度影响，让移动更平滑
+            this.setDeltaMovement(this.getDeltaMovement().add(repelX * 0.2, repelY * 0.2, repelZ * 0.2));
         }
     }
 
@@ -221,11 +260,10 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
      * 从其他人偶接收排斥力
      */
     public void applyRepulsionFrom(DollEntity source, Vec3 repel) {
-        if (this.noPhysics) {
-            Vec3 newPos = this.position().subtract(repel);
-            this.moveTo(newPos.x, newPos.y, newPos.z);
-            this.setDeltaMovement(this.getDeltaMovement().subtract(repel));
-        }
+        if (!this.noPhysics) return; // 只在无碰撞箱时响应
+        Vec3 newPos = this.position().add(repel.x, repel.y, repel.z);
+        this.moveTo(newPos.x, newPos.y, newPos.z);
+        this.setDeltaMovement(this.getDeltaMovement().add(repel.x * 0.2, repel.y * 0.2, repel.z * 0.2));
     }
 
     public void syncEquipmentToClient() {
@@ -396,7 +434,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
     @Override
     public boolean hurt(DamageSource source, float amount) {
         if (source.is(DamageTypeTags.IS_FALL)) return false;
-
+        
         if (this.isBlocking() && !source.is(DamageTypeTags.BYPASSES_ARMOR)) {
             float reducedAmount = amount * 0.5f;
             if (source.getDirectEntity() instanceof LivingEntity attacker && !isSameOwner(attacker)) {
@@ -407,7 +445,8 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
             if (source.getDirectEntity() instanceof LivingEntity attacker) {
                 ItemStack weapon = attacker.getMainHandItem();
                 if (weapon.canDisableShield(ItemStack.EMPTY, this, attacker)) {
-                    this.shieldDisableTicks = 100;
+                    CombatParameters params = this.getDollData().getCombatParams();
+                    this.shieldDisableTicks = params.getShieldDisableTime();
                 }
             }
             if (reducedAmount > 0) {
@@ -416,15 +455,38 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                 return false;
             }
         }
+
+        if (this.getJobType() == DollJobType.DEFENDER && !source.is(DamageTypeTags.IS_FALL)) {
+            CombatParameters params = this.getDollData().getCombatParams();
+            int disableTime = params.getShieldDisableTime();
+            // 检测斧头破盾效果
+            if (source.getDirectEntity() instanceof LivingEntity attacker) {
+                ItemStack weapon = attacker.getMainHandItem();
+                if (weapon.canDisableShield(ItemStack.EMPTY, this, attacker)) {
+                    disableTime = (int)(disableTime * 1.5);
+                }
+            }
+            this.setShieldDisableTicks(disableTime);
+        }
         return super.hurt(source, amount);
     }
 
     @Override
     public boolean isBlocking() {
         DollJobType job = getJobType();
-        return (job == DollJobType.GUARD || job == DollJobType.DEFENDER)
-                && shieldDisableTicks <= 0
-                && stateManager.getCurrentState() == DollState.ENGAGING;
+        if (!(job == DollJobType.GUARD || job == DollJobType.DEFENDER)) return false;
+        if (shieldDisableTicks > 0) return false;
+        
+        ItemStack offHand = getOffhandItem();
+        boolean hasShield = offHand.getItem() instanceof ShieldItem;
+        if (!hasShield) return false;
+
+        if (job == DollJobType.DEFENDER) {
+            // 守御人偶：只要持有盾牌且未破盾就举盾，不依赖状态
+            return true;
+        }
+        // 近卫人偶：需处于战斗状态才举盾
+        return stateManager.getCurrentState() == DollState.ENGAGING;
     }
 
     public int getShieldDisableTicks() { return shieldDisableTicks; }
@@ -446,9 +508,9 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                 arrow = new Arrow(this.level(), this, new ItemStack(Items.ARROW), null);
                 arrow.setBaseDamage(3.0D);
             }
-        } else if (job == DollJobType.GUARD && (weapon == WeaponType.CROSSBOW || weapon == WeaponType.BOW)) {
+        } else if ((job == DollJobType.GUARD || job == DollJobType.VANGUARD) && (weapon == WeaponType.CROSSBOW || weapon == WeaponType.BOW)) {
             arrow = new Arrow(this.level(), this, new ItemStack(Items.ARROW), null);
-            arrow.setBaseDamage(2.0D); // 近卫远程伤害略低
+            arrow.setBaseDamage(2.0D); // 近卫/游侠远程伤害略低
             LOGGER.info("[远程攻击] 职业类型：" + job + " 武器类型：" + weapon);
         }
 

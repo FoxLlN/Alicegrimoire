@@ -189,6 +189,7 @@ public class DollData {
         tag.putInt("RibbonColor", ribbonColor);
         tag.put("CustomData", customData);
 
+        // 保存物品栏
         CompoundTag invTag = new CompoundTag();
         for (int i = 0; i < inventory.length; i++) {
             if (!inventory[i].isEmpty()) {
@@ -196,6 +197,9 @@ public class DollData {
             }
         }
         tag.put("Inventory", invTag);
+
+        // 保存战斗参数
+        tag.put("CombatParams", combatParams.save(registries));
 
         return tag;
     }
@@ -218,6 +222,8 @@ public class DollData {
         this.hairColor = tag.getInt("HairColor");
         this.eyeColor = tag.getInt("EyeColor");
         this.ribbonColor = tag.getInt("RibbonColor");
+        this.customData = tag.getCompound("CustomData");
+
         // 加载物品栏
         if (tag.contains("Inventory")) {
             CompoundTag invTag = tag.getCompound("Inventory");
@@ -229,7 +235,10 @@ public class DollData {
             }
         }
 
-        this.customData = tag.getCompound("CustomData");
+        // 加载战斗参数
+        if (tag.contains("CombatParams")) {
+            combatParams.load(tag.getCompound("CombatParams"), registries);
+        }
     }
     
     // ========== 复制 ==========
