@@ -1,7 +1,7 @@
 {
   "itemGroup.alicegrimoire": "Alice Grimoire",
   "item.alicegrimoire.magiweaver": "Magiweaver",
-  "item.alicegrimoire.doll_wand": "Doll Wand",
+  "item.alicegrimoire.doll_baton": "Doll Baton",
   "item.alicegrimoire.doll_net": "Doll Net",
   "item.alicegrimoire.doll_string": "Doll String",
   "item.alicegrimoire.doll_basket": "Doll Basket",
@@ -11,18 +11,31 @@
   "block.alicegrimoire.doll": "Doll",
   "entity.alicegrimoire.doll": "Doll",
   "container.magiweaver": "Magiweaver",
+
   "doll_type.alicegrimoire.standard": "Standard Doll",
   "doll_type.alicegrimoire.sword": "Sword Doll",
   "doll_type.alicegrimoire.guard": "Guard Doll",
   "doll_type.alicegrimoire.pillager": "Pillager Doll",
   "doll_type.alicegrimoire.lancer": "Lancer Doll",
   "doll_type.alicegrimoire.sharpshooter": "Sharpshooter Doll",
+
   "label.alicegrimoire.type": "Type: %s",
   "label.alicegrimoire.health": "HP: %d",
   "label.alicegrimoire.armor": "Armor: %d",
   "label.alicegrimoire.attack": "Attack: %d",
+
+  "message.alicegrimoire.doll_no_target": "No target in sight!",
+  "message.alicegrimoire.doll_cannot_target_self": "Cannot make a doll attack itself!",
+  "message.alicegrimoire.doll_cannot_target_ally": "Cannot attack friendly dolls!",
+  "message.alicegrimoire.doll_no_available": "No available dolls to command!",
+  "message.alicegrimoire.doll_all_attack": "%d dolls are attacking the target!",
+  "message.alicegrimoire.doll_all_stuck": "All available dolls are stuck!",
   "message.alicegrimoire.doll_locked_target": "A doll has locked onto the target",
-  "message.alicegrimoire.doll_stop_attack": "All dolls have stopped attacking",
+  "message.alicegrimoire.doll_stop_attack_all": "Stopped %d dolls from attacking",
+  "message.alicegrimoire.doll_no_attack": "No dolls are attacking",
+  "message.alicegrimoire.doll_stop_single": "Stopped that doll from attacking",
+  "message.alicegrimoire.doll_not_angry": "That doll is not enraged",
+  "message.alicegrimoire.doll_stop_target": "Stopped %d dolls from attacking that target",
   "message.alicegrimoire.doll_returning": "Dolls are returning to your side",
   "message.alicegrimoire.doll_working": "Dolls have returned to work state"
 }

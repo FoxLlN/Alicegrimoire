@@ -18,7 +18,7 @@ public class ModCreativeModeTabs {
             .icon(() -> new ItemStack(ModItems.DOLL.get()))
             .displayItems((parameters, output) -> {
                 output.accept(ModItems.MAGIWEAVER.get());
-                output.accept(ModItems.DOLL_WAND.get());
+                output.accept(ModItems.DOLL_BATON.get());
                 output.accept(ModItems.DOLL_NET.get());
                 output.accept(ModItems.DOLL_STRING.get());
                 output.accept(ModItems.DOLL_BASKET.get());

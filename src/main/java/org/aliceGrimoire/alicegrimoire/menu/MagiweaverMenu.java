@@ -13,7 +13,7 @@ import net.minecraft.world.item.Items;
 import org.aliceGrimoire.alicegrimoire.entity.doll.data.DollJobType; 
 import org.aliceGrimoire.alicegrimoire.item.DollItem;
 import org.aliceGrimoire.alicegrimoire.item.DollStringItem;
-import org.aliceGrimoire.alicegrimoire.item.DollWandItem;
+import org.aliceGrimoire.alicegrimoire.item.baton.DollBatonItem;
 import org.aliceGrimoire.alicegrimoire.registry.ModMenuTypes;
 import org.aliceGrimoire.alicegrimoire.registry.ModBlocks;
 import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
@@ -43,7 +43,7 @@ public class MagiweaverMenu extends AbstractContainerMenu {
         this.addSlot(new Slot(centerContainer, 0, 38, 38) {
             @Override
             public boolean mayPlace(ItemStack stack) {
-                return stack.getItem() instanceof DollItem || stack.getItem() instanceof DollStringItem || stack.getItem() instanceof DollWandItem;
+                return stack.getItem() instanceof DollItem || stack.getItem() instanceof DollStringItem || stack.getItem() instanceof DollBatonItem;
             }
 
             @Override
@@ -157,7 +157,7 @@ public class MagiweaverMenu extends AbstractContainerMenu {
                     return ItemStack.EMPTY;
                 }
             } else { // From player inventory
-                if (itemstack1.getItem() instanceof DollItem || itemstack1.getItem() instanceof DollStringItem || itemstack1.getItem() instanceof DollWandItem) {
+                if (itemstack1.getItem() instanceof DollItem || itemstack1.getItem() instanceof DollStringItem || itemstack1.getItem() instanceof DollBatonItem) {
                     if (!this.moveItemStackTo(itemstack1, 0, 1, false)) {
                         return ItemStack.EMPTY;
                     }

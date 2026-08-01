@@ -21,18 +21,20 @@ public class PacketHandler {
     public static void register(final RegisterPayloadHandlersEvent event) {
         final PayloadRegistrar registrar = event.registrar(Alicegrimoire.MODID);
 
-        StreamCodec<RegistryFriendlyByteBuf, DollWandLeftClickPacket> leftCodec =
+        // 左键包
+        StreamCodec<RegistryFriendlyByteBuf, DollBatonLeftClickPacket> leftCodec =
             StreamCodec.ofMember(
-                (buf, pkt) -> {},
-                buf -> new DollWandLeftClickPacket()
+                DollBatonLeftClickPacket::write,
+                DollBatonLeftClickPacket::new
             );
-        registrar.playToServer(DollWandLeftClickPacket.TYPE, leftCodec, DollWandLeftClickPacket::handle);
+        registrar.playToServer(DollBatonLeftClickPacket.TYPE, leftCodec, DollBatonLeftClickPacket::handle);
 
-        StreamCodec<RegistryFriendlyByteBuf, DollWandRightClickPacket> rightCodec =
+        // 右键包
+        StreamCodec<RegistryFriendlyByteBuf, DollBatonRightClickPacket> rightCodec =
             StreamCodec.ofMember(
-                (buf, pkt) -> {},
-                buf -> new DollWandRightClickPacket()
+                DollBatonRightClickPacket::write,
+                DollBatonRightClickPacket::new
             );
-        registrar.playToServer(DollWandRightClickPacket.TYPE, rightCodec, DollWandRightClickPacket::handle);
+        registrar.playToServer(DollBatonRightClickPacket.TYPE, rightCodec, DollBatonRightClickPacket::handle);
     }
 }

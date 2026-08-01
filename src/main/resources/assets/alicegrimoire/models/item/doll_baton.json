@@ -4,15 +4,20 @@
   "display": {
     "firstperson_righthand": {
       "translation": [
-        0,
-        -1.25,
+        1,
+        1.5,
         0
       ]
     },
-    "firstperson_lefthand": {
+    "gui": {
+      "rotation": [
+        31.820000000000164,
+        31.579999999999927,
+        -55.570000000000164
+      ],
       "translation": [
-        0,
-        -1.25,
+        -2.5,
+        -2.25,
         0
       ]
     }
