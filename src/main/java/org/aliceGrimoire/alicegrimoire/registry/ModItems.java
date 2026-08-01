@@ -1,8 +1,6 @@
 package org.aliceGrimoire.alicegrimoire.registry;
 
-import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ArmorMaterials;
-import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.SwordItem;
 import net.minecraft.world.item.Tiers;
@@ -11,7 +9,6 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import org.aliceGrimoire.alicegrimoire.Alicegrimoire;
 import org.aliceGrimoire.alicegrimoire.item.*;
 import org.aliceGrimoire.alicegrimoire.item.baton.DollBatonItem;
-import org.aliceGrimoire.alicegrimoire.registry.ModBlocks;
 
 public class ModItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(Alicegrimoire.MODID);

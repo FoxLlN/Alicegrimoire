@@ -1,14 +1,10 @@
 package org.aliceGrimoire.alicegrimoire.client;
 
-import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.component.CustomData;
 import org.aliceGrimoire.alicegrimoire.Alicegrimoire;
 import org.aliceGrimoire.alicegrimoire.block.DollBlockEntity;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.data.DollJobType;
-import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
 import software.bernie.geckolib.animatable.GeoAnimatable;
 import software.bernie.geckolib.model.GeoModel;
 

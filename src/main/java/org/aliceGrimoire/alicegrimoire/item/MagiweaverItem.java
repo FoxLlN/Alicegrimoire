@@ -1,6 +1,5 @@
 package org.aliceGrimoire.alicegrimoire.item;
 
-import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.item.BlockItem;
 import org.aliceGrimoire.alicegrimoire.client.AliceHandheldRenderer;

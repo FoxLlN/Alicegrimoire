@@ -1,6 +1,5 @@
 package org.aliceGrimoire.alicegrimoire.registry;
 
-import com.mojang.serialization.Codec;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.codec.ByteBufCodecs;
