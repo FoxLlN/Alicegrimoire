@@ -98,8 +98,16 @@ public class DollBatonHandler {
         double bestDot = -1.0;
 
         for (Entity entity : entities) {
-            if (entity instanceof DollEntity) continue;
             if (!(entity instanceof LivingEntity living)) continue;
+
+            // 跳过己方人偶，敌方人偶允许被选中
+            if (entity instanceof DollEntity doll) {
+                LivingEntity owner = doll.getOwner();
+                if (owner != null && owner.equals(player)) {
+                    continue; // 自己的不能攻击
+                }
+                // 敌方人偶继续执行
+            }
 
             AABB aabb = entity.getBoundingBox();
             Optional<Vec3> hitPos = aabb.clip(start, end);

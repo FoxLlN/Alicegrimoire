@@ -152,7 +152,23 @@ public class DollStateManager {
             doll.noPhysics = true;
         }
         
-        doll.refreshDimensions(); // 更新碰撞箱 
+        doll.refreshDimensions(); // 更新碰撞箱
+        
+        // ===== 距离检测：超过24格强制进入恢复状态 =====
+        LivingEntity owner = doll.getOwner();
+        if (owner != null && doll.isTethered()) {
+            double dist = doll.distanceTo(owner);
+            double dragForce = doll.getDollData().getDragForceRange();
+            
+            if (dist > dragForce && doll.isEnraged()) {
+                // 强制解除激怒已由 DollEntity.tick() 处理
+                // 这里确保状态切换
+                if (currentState == DollState.ENGAGING) {
+                    setState(DollState.RECOVERING);
+                    recoveryTicks = 0;
+                }
+            }
+        }
     }
 
     /**

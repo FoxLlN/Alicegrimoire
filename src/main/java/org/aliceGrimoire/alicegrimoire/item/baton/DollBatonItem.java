@@ -64,11 +64,14 @@ public class DollBatonItem extends SwordItem implements GeoItem {
     }
 
     // ============================================================
-    // 业务逻辑方法（保持原样，只是调用管理类）
+    // 业务逻辑方法
     // ============================================================
 
     /**
-     * 左键点击处理
+     * 左键点击处理（攻击指令）
+     * 修改点：
+     * 1. 允许攻击敌方人偶（仅阻止己方人偶）
+     * 2. 所有指令仅对拴住的人偶生效
      */
     public static void handleLeftClick(Player player, boolean shiftDown) {
         if (player.level().isClientSide()) return;
@@ -83,20 +86,20 @@ public class DollBatonItem extends SwordItem implements GeoItem {
             return;
         }
 
-        // 检查目标是否有效（不能是其他人的人偶）
+        // 阻止攻击己方人偶，允许攻击敌方人偶
         if (target instanceof DollEntity doll) {
             LivingEntity owner = doll.getOwner();
             if (owner != null && owner.equals(player)) {
                 player.displayClientMessage(Component.translatable("message.alicegrimoire.doll_cannot_target_ally"), true);
                 return;
             }
-            player.displayClientMessage(Component.translatable("message.alicegrimoire.doll_cannot_target_ally"), true);
-            return;
+            // 如果是敌方人偶，继续执行（不拦截）
         }
 
+        // 只获取拴住的人偶
         List<DollEntity> dolls = level.getEntitiesOfClass(DollEntity.class,
                 player.getBoundingBox().inflate(64.0D),
-                doll -> player.getUUID().equals(doll.getOwnerUUID()));
+                doll -> player.getUUID().equals(doll.getOwnerUUID()) && doll.isTethered());
 
         if (dolls.isEmpty()) {
             player.displayClientMessage(Component.translatable("message.alicegrimoire.doll_no_available"), true);
@@ -104,9 +107,10 @@ public class DollBatonItem extends SwordItem implements GeoItem {
         }
 
         if (shiftDown) {
-            // Shift + 左键：所有人偶攻击
+            // Shift + 左键：所有拴住的人偶攻击目标
             int count = 0;
             for (DollEntity doll : dolls) {
+                // 防御性检查：确保拴住
                 if (doll.isTethered() && doll.canBeEnraged() && !doll.isInsideBlock()) {
                     doll.setEnraged(true);
                     doll.setTarget(target);
@@ -124,7 +128,7 @@ public class DollBatonItem extends SwordItem implements GeoItem {
                 player.displayClientMessage(Component.translatable("message.alicegrimoire.doll_no_available"), true);
             }
         } else {
-            // 普通左键：单个人偶攻击
+            // 普通左键：选择一个人偶攻击
             DollEntity selectedDoll = selectDoll(dolls, target);
             if (selectedDoll != null) {
                 if (target == selectedDoll) {
@@ -159,7 +163,8 @@ public class DollBatonItem extends SwordItem implements GeoItem {
     }
 
     /**
-     * 右键点击处理
+     * 右键点击处理（解除指令）
+     * 所有操作仅对拴住的人偶生效
      */
     public static void handleRightClick(Player player, boolean shiftDown) {
         if (player.level().isClientSide()) return;
@@ -167,10 +172,10 @@ public class DollBatonItem extends SwordItem implements GeoItem {
         Level level = player.level();
 
         if (shiftDown) {
-            // Shift + 右键：解除所有人偶激怒
+            // Shift + 右键：解除所有拴住人偶的激怒
             List<DollEntity> dolls = level.getEntitiesOfClass(DollEntity.class,
                     player.getBoundingBox().inflate(64.0),
-                    doll -> player.getUUID().equals(doll.getOwnerUUID()));
+                    doll -> player.getUUID().equals(doll.getOwnerUUID()) && doll.isTethered());
             int count = 0;
             for (DollEntity doll : dolls) {
                 if (doll.isEnraged()) {
@@ -195,7 +200,8 @@ public class DollBatonItem extends SwordItem implements GeoItem {
             }
 
             if (target instanceof DollEntity doll) {
-                if (player.getUUID().equals(doll.getOwnerUUID())) {
+                // 目标是己方人偶，且需拴住
+                if (player.getUUID().equals(doll.getOwnerUUID()) && doll.isTethered()) {
                     if (doll.isEnraged()) {
                         doll.setEnraged(false);
                         doll.setTarget(null);
@@ -206,12 +212,15 @@ public class DollBatonItem extends SwordItem implements GeoItem {
                     } else {
                         player.displayClientMessage(Component.translatable("message.alicegrimoire.doll_not_angry"), true);
                     }
+                } else {
+                    player.displayClientMessage(Component.translatable("message.alicegrimoire.doll_cannot_target_ally"), true);
                 }
             } else {
-                // 指向生物：解除所有攻击该生物的人偶
+                // 指向非人偶生物：解除所有拴住人偶对该目标的攻击
                 List<DollEntity> dolls = level.getEntitiesOfClass(DollEntity.class,
                         player.getBoundingBox().inflate(64.0),
                         doll -> player.getUUID().equals(doll.getOwnerUUID()) &&
+                                doll.isTethered() &&
                                 doll.getTarget() != null &&
                                 doll.getTarget().equals(target));
                 int count = 0;
@@ -240,13 +249,17 @@ public class DollBatonItem extends SwordItem implements GeoItem {
         return selectDoll(dolls, target, false);
     }
 
+    /**
+     * 选择一个人偶进行攻击
+     * 修改点：增加拴住检查（防御性）
+     */
     private static DollEntity selectDoll(List<DollEntity> dolls, LivingEntity target, boolean allowStuck) {
         dolls.sort(Comparator.comparingLong(DollEntity::getEvokeTime));
         for (DollEntity doll : dolls) {
+            // 确保拴住（传入列表已过滤，但防御）
+            if (!doll.isTethered()) continue;
             if (!doll.isEnraged() && doll.isAlive()) {
-                if (!allowStuck && doll.isInsideBlock()) {
-                    continue;
-                }
+                if (!allowStuck && doll.isInsideBlock()) continue;
                 if (doll.canBeEnraged()) {
                     return doll;
                 }

@@ -1,6 +1,7 @@
 package org.aliceGrimoire.alicegrimoire.entity;
 
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
 import net.minecraft.network.syncher.EntityDataSerializers;
 import net.minecraft.network.syncher.SynchedEntityData;
@@ -12,6 +13,7 @@ import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.ai.goal.Goal;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.RangedAttackMob;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.world.entity.projectile.Arrow;
 import net.minecraft.world.item.ItemStack;
@@ -172,6 +174,24 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                 }
             }
             
+            // ===== 距离检测：强制解除激怒 =====
+            if (owner != null && tethered) {
+                double distance = this.distanceTo(owner);
+                double dragForce = this.getDollData().getDragForceRange(); // 24
+                if (distance > dragForce) {
+                    if (this.isEnraged()) {
+                        this.setEnraged(false);
+                        this.setTarget(null);
+                        if (owner instanceof Player player) {
+                            player.displayClientMessage(
+                                Component.translatable("message.alicegrimoire.doll_too_far"),
+                                true
+                            );
+                        }
+                    }
+                }
+            }
+
             // 3. 状态机更新
             stateManager.tick();
             
@@ -209,7 +229,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         }
 
         // 8. 人偶互相排斥
-        if (!this.level().isClientSide && this.noPhysics) {
+        if (!this.level().isClientSide) {
             applyRepulsion();
         }
         if (shieldDisableTicks > 0) {
@@ -221,29 +241,29 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
      * 应用人偶之间的排斥力
      */
     private void applyRepulsion() {
-        // 使用 AABB 膨胀检测，只获取最近的人偶
         List<DollEntity> nearby = this.level().getEntitiesOfClass(
             DollEntity.class,
             this.getBoundingBox().inflate(1.5),
-            other -> other != this && other.noPhysics
+            other -> other != this
         );
-        
         if (nearby.isEmpty()) return;
-        
+
         double repelX = 0, repelY = 0, repelZ = 0;
         for (DollEntity other : nearby) {
             double dx = this.getX() - other.getX();
             double dy = this.getY() - other.getY();
             double dz = this.getZ() - other.getZ();
             double distSq = dx*dx + dy*dy + dz*dz;
-            if (distSq < 1.0 && distSq > 0.0001) { // 1.0格以内
+            if (distSq < 1.0 && distSq > 0.0001) {
                 double dist = Math.sqrt(distSq);
-                double strength = Math.min(0.3 / (dist + 0.1), 0.3);
+                // 强度根据是否开启物理而调整：开启物理时减小强度，避免干扰碰撞箱
+                double strength = this.noPhysics ? 0.3 / (dist + 0.1) : 0.1 / (dist + 0.1);
+                strength = Math.min(strength, 0.3);
                 double invDist = 1.0 / dist;
                 repelX += dx * invDist * strength;
                 repelY += dy * invDist * strength;
                 repelZ += dz * invDist * strength;
-                // 同步给对面施加反向力
+                // 给对面也施加力
                 other.applyRepulsionFrom(this, new Vec3(-dx * invDist * strength, -dy * invDist * strength, -dz * invDist * strength));
             }
         }

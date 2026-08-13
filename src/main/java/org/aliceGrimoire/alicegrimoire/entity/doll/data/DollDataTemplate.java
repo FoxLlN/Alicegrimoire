@@ -18,10 +18,18 @@ public record DollDataTemplate(
     double strikeSpeedMultiplier,
     
     // 移动属性
-    double tetherRange,
     double flightSpeed,
     double turnSpeed,
     
+    // 范围属性
+    double tetherRange,
+    double enrageRange,
+    double dragStartRange,
+    double dragForceRange,
+    
+    // 名额控制
+    boolean occupiesSlot,
+
     // 职业/状态
     DollJobType jobType,
     boolean hasShield,
@@ -40,7 +48,9 @@ public record DollDataTemplate(
     public static final DollDataTemplate DEFAULT = new DollDataTemplate(
         20.0, 2.0, 0, 0, 0,
         0.1, 1.1, 1.5,
-        8.0, 1.0, 1.0,
+        1.0, 1.0,
+        8.0, 16.0, 16.0, 24.0,
+        true,
         DollJobType.STANDARD, false,
         0xE8C8A0, 0x4A7A9C, 0xCC2233,
         createDefault()
@@ -51,7 +61,9 @@ public record DollDataTemplate(
     public static final DollDataTemplate GUARD_TEMPLATE = new DollDataTemplate(
         32.0, 4.0, 4, 0, 0,
         0.1, 1.1, 1.5,
-        4.0, 1.0, 1.0,
+        1.0, 1.0,
+        8.0, 16.0, 16.0, 24.0,
+        true,
         DollJobType.GUARD, true,
         0xE8C8A0, 0x4A7A9C, 0x4488CC,
         createGuard()
@@ -61,7 +73,9 @@ public record DollDataTemplate(
     public static final DollDataTemplate DEFENDER_TEMPLATE = new DollDataTemplate(
         28.0, 2.0, 6, 2, 0.2,
         0.08, 1.0, 1.2,
-        4.0, 0.8, 1.2,
+        0.8, 1.2,
+        8.0, 16.0, 16.0, 24.0,
+        true,
         DollJobType.DEFENDER, true,
         0xE8C8A0, 0x4A7A9C, 0x88AA44,
         createDefender()
@@ -71,7 +85,9 @@ public record DollDataTemplate(
     public static final DollDataTemplate SHARPSHOOTER_TEMPLATE = new DollDataTemplate(
         16.0, 2.0, 0, 0, 0,
         0.12, 1.2, 1.8,
-        8.0, 1.2, 1.5,
+        1.2, 1.5,
+        8.0, 16.0, 16.0, 24.0,
+        true,
         DollJobType.SHARPSHOOTER, false,
         0xE8C8A0, 0x4A7A9C, 0xCC8844,
         createSharpshooter()
@@ -81,7 +97,9 @@ public record DollDataTemplate(
     public static final DollDataTemplate VANGUARD_TEMPLATE = new DollDataTemplate(
         24.0, 4.0, 2, 0, 0,
         0.12, 1.3, 2.0,
-        8.0, 1.2, 1.2,
+        1.2, 1.2,
+        8.0, 16.0, 16.0, 24.0,
+        true,
         DollJobType.VANGUARD, false,
         0xE8C8A0, 0x4A7A9C, 0xCC4488,
         createVanguard()

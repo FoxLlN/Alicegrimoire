@@ -1,6 +1,7 @@
 package org.aliceGrimoire.alicegrimoire.item;
 
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.InteractionResultHolder;
@@ -17,6 +18,7 @@ import net.minecraft.world.item.component.CustomData;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.data.DollJobType;
 import org.aliceGrimoire.alicegrimoire.event.PlayerMoveDetector;
+import org.aliceGrimoire.alicegrimoire.item.string.StringHelper;
 import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
 import org.aliceGrimoire.alicegrimoire.registry.ModEntities;
 import org.aliceGrimoire.alicegrimoire.client.DollModel;
@@ -65,7 +67,6 @@ public class DollItem extends BlockItem implements GeoItem {
         if (context.getPlayer() != null && context.getPlayer().isShiftKeyDown()) {
             InteractionResult result = super.useOn(context);
             if (result == InteractionResult.SUCCESS) {
-                // Set type to block entity
                 BlockEntity be = context.getLevel().getBlockEntity(context.getClickedPos());
                 if (be instanceof org.aliceGrimoire.alicegrimoire.block.DollBlockEntity dollBe) {
                     DollJobType type = context.getItemInHand().getOrDefault(ModDataComponents.DOLL_TYPE.get(), DollJobType.STANDARD);
@@ -82,27 +83,46 @@ public class DollItem extends BlockItem implements GeoItem {
         ItemStack itemstack = player.getItemInHand(hand);
         if (!player.isShiftKeyDown()) {
             if (!level.isClientSide) {
+                // ===== 1. 检查丝线和数量上限 =====
+                boolean hasString = StringHelper.hasStringEquipped(player);
+
+                if (hasString) {
+                    boolean canTether = StringHelper.canTetherMore(player);
+                    if (!canTether) {
+                        // 有丝线但已满 → 提示并返回失败（不生成）
+                        player.displayClientMessage(
+                            Component.translatable("message.alicegrimoire.doll_max_tethered_full",
+                                StringHelper.getMaxTethered(player)),
+                            true
+                        );
+                        return InteractionResultHolder.fail(itemstack);
+                    }
+                }
+
+                // ===== 2. 通过检查，创建人偶 =====
                 DollEntity doll = ModEntities.DOLL.get().create(level);
                 if (doll != null) {
                     CustomData entityData = itemstack.get(DataComponents.ENTITY_DATA);
                     if (entityData != null) {
                         doll.load(entityData.copyTag());
                     }
-                    
-                    // Set type from component
+
                     DollJobType type = itemstack.getOrDefault(ModDataComponents.DOLL_TYPE.get(), DollJobType.STANDARD);
                     doll.setJobType(type);
 
                     doll.setOwnerUUID(player.getUUID());
-                    // 立即获取移动状态
                     doll.setPlayerMoving(PlayerMoveDetector.getPlayerMoving(player.getUUID()));
                     doll.moveTo(player.getX(), player.getEyeY(), player.getZ(), player.getYRot(), player.getXRot());
-                    
+
                     Vec3 look = player.getLookAngle();
                     doll.setDeltaMovement(look.scale(1.5D));
+
+                    // 拴住状态由 tick 管理，这里不主动设置
+                    // 唤起动画（只要有丝线或没有丝线都播放）
                     doll.setEvokeTime(level.getGameTime());
-                    
+
                     level.addFreshEntity(doll);
+
                     if (!player.getAbilities().instabuild) {
                         itemstack.shrink(1);
                     }

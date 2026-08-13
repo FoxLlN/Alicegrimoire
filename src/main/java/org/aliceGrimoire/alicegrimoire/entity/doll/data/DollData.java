@@ -24,9 +24,17 @@ public class DollData {
     private double strikeSpeedMultiplier; // 出击速度倍率 (相对于跟随速度)
     
     // ========== 移动属性 ==========
-    private double tetherRange;           // 拴绳范围 (活动半径)
     private double flightSpeed;           // 飞行速度 (整体速度倍率)
     private double turnSpeed;             // 转向速度
+
+    // ========== 距离/范围属性 ==========
+    private double tetherRange;           // 活动半径（游荡/跟随范围）
+    private double enrageRange;           // 激怒触发范围
+    private double dragStartRange;        // 强制拖回起始距离（= enrageRange）
+    private double dragForceRange;        // 强制解除激怒距离（= enrageRange * 1.5）
+    
+    // ========== 拴住名额控制（供改装使用） ==========
+    private boolean occupiesSlot;         // 是否占用拴住名额
     
     // ========== 职业/武器 ==========
     private DollJobType jobType;          // 职业类型
@@ -73,9 +81,13 @@ public class DollData {
         this.wanderSpeed = template.wanderSpeed();
         this.followSpeedMultiplier = template.followSpeedMultiplier();
         this.strikeSpeedMultiplier = template.strikeSpeedMultiplier();
-        this.tetherRange = template.tetherRange();
         this.flightSpeed = template.flightSpeed();
         this.turnSpeed = template.turnSpeed();
+        this.tetherRange = template.tetherRange();
+        this.enrageRange = template.enrageRange();
+        this.dragStartRange = template.dragStartRange();
+        this.dragForceRange = template.dragForceRange();
+        this.occupiesSlot = template.occupiesSlot();
         this.jobType = template.jobType();
         this.hasShield = template.hasShield();
         this.hairColor = template.hairColor();
@@ -104,13 +116,22 @@ public class DollData {
     public double getStrikeSpeedMultiplier() { return strikeSpeedMultiplier; }
     public void setStrikeSpeedMultiplier(double multiplier) { this.strikeSpeedMultiplier = multiplier; }
     
-    public double getTetherRange() { return tetherRange; }
-    public void setTetherRange(double range) { this.tetherRange = range; }
-    
     public double getFlightSpeed() { return flightSpeed; }
     public void setFlightSpeed(double speed) { this.flightSpeed = speed; }
     public double getTurnSpeed() { return turnSpeed; }
     
+    public double getTetherRange() { return tetherRange; }
+    public void setTetherRange(double range) { this.tetherRange = range; }
+    public double getEnrageRange() { return enrageRange; }
+    public void setEnrageRange(double range) { this.enrageRange = range; }
+    public double getDragStartRange() { return dragStartRange; }
+    public void setDragStartRange(double range) { this.dragStartRange = range; }
+    public double getDragForceRange() { return dragForceRange; }
+    public void setDragForceRange(double range) { this.dragForceRange = range; }
+
+    public boolean getOccupiesSlot() { return occupiesSlot; }
+    public void setOccupiesSlot(boolean occupiesSlot) { this.occupiesSlot = occupiesSlot; }
+
     public DollJobType getJobType() { return jobType; }
     public void setJobType(DollJobType jobType) { this.jobType = jobType; }
     
@@ -162,11 +183,6 @@ public class DollData {
         return inventory;
     }
 
-    // ========== 辅助方法 ==========
-    private WeaponType detectWeaponType(ItemStack stack) {
-        return WeaponType.fromItemStack(stack);
-    }
-    
     // ========== NBT 持久化 ==========
     public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
@@ -178,9 +194,13 @@ public class DollData {
         tag.putDouble("WanderSpeed", wanderSpeed);
         tag.putDouble("FollowSpeedMultiplier", followSpeedMultiplier);
         tag.putDouble("StrikeSpeedMultiplier", strikeSpeedMultiplier);
-        tag.putDouble("TetherRange", tetherRange);
         tag.putDouble("FlightSpeed", flightSpeed);
         tag.putDouble("TurnSpeed", turnSpeed);
+        tag.putDouble("TetherRange", tetherRange);
+        tag.putDouble("EnrageRange", enrageRange);
+        tag.putDouble("DragStartRange", dragStartRange);
+        tag.putDouble("DragForceRange", dragForceRange);
+        tag.putBoolean("OccupiesSlot", occupiesSlot);
         tag.putString("JobType", jobType.name());
         tag.putBoolean("IsBroken", isBroken);
         tag.putBoolean("HasShield", hasShield);
@@ -213,9 +233,13 @@ public class DollData {
         this.wanderSpeed = tag.getDouble("WanderSpeed");
         this.followSpeedMultiplier = tag.getDouble("FollowSpeedMultiplier");
         this.strikeSpeedMultiplier = tag.getDouble("StrikeSpeedMultiplier");
-        this.tetherRange = tag.getDouble("TetherRange");
         this.flightSpeed = tag.getDouble("FlightSpeed");
         this.turnSpeed = tag.getDouble("TurnSpeed");
+        this.tetherRange = tag.getDouble("TetherRange");
+        this.enrageRange = tag.getDouble("EnrageRange");
+        this.dragStartRange = tag.getDouble("DragStartRange");
+        this.dragForceRange = tag.getDouble("DragForceRange");
+        this.occupiesSlot = tag.getBoolean("OccupiesSlot");
         this.jobType = DollJobType.valueOf(tag.getString("JobType"));
         this.isBroken = tag.getBoolean("IsBroken");
         this.hasShield = tag.getBoolean("HasShield");
@@ -247,7 +271,9 @@ public class DollData {
         copy.applyTemplate(new DollDataTemplate(
             maxHealth, damage, armor, armorToughness, knockbackResistance,
             wanderSpeed, followSpeedMultiplier, strikeSpeedMultiplier,
-            tetherRange, flightSpeed, turnSpeed, 
+            flightSpeed, turnSpeed, 
+            tetherRange, enrageRange, dragStartRange, dragForceRange,
+            occupiesSlot,
             jobType, hasShield,
             hairColor, eyeColor, ribbonColor,
             combatParams.copy() // 传递副本

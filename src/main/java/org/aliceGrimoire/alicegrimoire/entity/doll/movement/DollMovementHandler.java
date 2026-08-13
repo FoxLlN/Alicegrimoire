@@ -40,6 +40,20 @@ public class DollMovementHandler {
         DollState state = stateManager.getCurrentState();
         LivingEntity owner = doll.getOwner();
 
+        // ===== 强制拖回（最高优先级） =====
+        if (owner != null && doll.isTethered()) {
+            double distance = doll.distanceTo(owner);
+            double dragStart = doll.getDollData().getDragStartRange(); // 默认16
+            if (distance > dragStart) {
+                Vec3 targetPos = owner.position().add(0, 0.5, 0);
+                // 速度随距离增大，最小2.0，最大5.0
+                double speed = Math.min(2.0 + (distance - dragStart) * 0.1, 5.0);
+                doll.getMoveControl().setWantedPosition(targetPos.x, targetPos.y, targetPos.z, speed);
+                // 直接返回，不执行后续移动逻辑
+                return;
+            }
+        }
+
         switch (state) {
             case IDLE:
                 // 随机游荡
