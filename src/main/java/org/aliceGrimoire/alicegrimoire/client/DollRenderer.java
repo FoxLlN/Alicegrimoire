@@ -48,11 +48,6 @@ public class DollRenderer extends GeoEntityRenderer<DollEntity> {
         poseStack.popPose();
     }
 
-    private boolean isTethered(LivingEntity owner) {
-        return !owner.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS).isEmpty() && 
-               owner.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS).getItem() instanceof org.aliceGrimoire.alicegrimoire.item.DollStringItem;
-    }
-
     private <E extends Entity> void renderLeash(DollEntity entity, float partialTick, PoseStack poseStack, MultiBufferSource bufferSource, E owner, int packedLight) {
         poseStack.pushPose();
         double d0 = (double)(Mth.lerp(partialTick, owner.yRotO, owner.getYRot()) * ((float)Math.PI / 180F));

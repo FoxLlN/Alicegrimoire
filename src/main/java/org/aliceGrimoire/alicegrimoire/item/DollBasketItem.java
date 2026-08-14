@@ -8,7 +8,6 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.component.DataComponents;
-import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.component.CustomData;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.event.PlayerMoveDetector;
