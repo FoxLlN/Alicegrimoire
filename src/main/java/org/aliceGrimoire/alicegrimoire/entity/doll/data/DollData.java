@@ -40,6 +40,7 @@ public class DollData {
     private DollJobType jobType;          // 职业类型
     
     // ========== 状态标志 ==========
+    private boolean tethered;             // 是否被拴住（持久）
     private boolean isBroken;             // 是否破损
     private boolean hasShield;            // 是否持盾 (守御人偶专用)
     
@@ -93,6 +94,7 @@ public class DollData {
         this.hairColor = template.hairColor();
         this.eyeColor = template.eyeColor();
         this.ribbonColor = template.ribbonColor();
+        this.tethered = false;
         this.isBroken = false;
         // ===== 复制战斗参数 =====
         this.combatParams = template.combatParams().copy();
@@ -166,7 +168,9 @@ public class DollData {
     public void setBroken(boolean broken) { this.isBroken = broken; }
     public boolean hasShield() { return hasShield; }
     public void setHasShield(boolean hasShield) { this.hasShield = hasShield; }
-    
+    public boolean isTethered() { return tethered; }
+    public void setTethered(boolean tethered) { this.tethered = tethered; }
+
     public int getHairColor() { return hairColor; }
     public void setHairColor(int hairColor) { this.hairColor = hairColor; }
     public int getEyeColor() { return eyeColor; }
@@ -204,6 +208,7 @@ public class DollData {
         tag.putString("JobType", jobType.name());
         tag.putBoolean("IsBroken", isBroken);
         tag.putBoolean("HasShield", hasShield);
+        tag.putBoolean("Tethered", tethered);
         tag.putInt("HairColor", hairColor);
         tag.putInt("EyeColor", eyeColor);
         tag.putInt("RibbonColor", ribbonColor);
@@ -241,6 +246,7 @@ public class DollData {
         this.dragForceRange = tag.getDouble("DragForceRange");
         this.occupiesSlot = tag.getBoolean("OccupiesSlot");
         this.jobType = DollJobType.valueOf(tag.getString("JobType"));
+        this.tethered = tag.getBoolean("Tethered");
         this.isBroken = tag.getBoolean("IsBroken");
         this.hasShield = tag.getBoolean("HasShield");
         this.hairColor = tag.getInt("HairColor");
@@ -285,6 +291,7 @@ public class DollData {
         }
         copy.isBroken = this.isBroken;
         copy.customData = this.customData.copy();
+        copy.tethered = this.tethered;
         return copy;
     }
 }

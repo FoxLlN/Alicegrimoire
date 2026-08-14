@@ -31,6 +31,7 @@ import org.aliceGrimoire.alicegrimoire.entity.doll.combat.DollTargetSelector;
 import org.aliceGrimoire.alicegrimoire.entity.doll.movement.DollMoveControl;
 import org.aliceGrimoire.alicegrimoire.entity.doll.movement.DollMovementHandler;
 import org.aliceGrimoire.alicegrimoire.entity.doll.util.DollCollisionHelper;
+import org.aliceGrimoire.alicegrimoire.item.string.StringHelper;
 import org.jetbrains.annotations.Nullable;
 
 import com.mojang.logging.LogUtils;
@@ -54,6 +55,9 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
     private int shieldDisableTicks = 0;
     private boolean isPlayerMoving = false;
     private int assignedTargetId = -1;
+
+    // ========== 状态管理器 ==========
+    private boolean lastHasString;
 
     // 返回模式（人偶哨）
     private boolean isReturning = false;
@@ -123,8 +127,40 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         if (!this.level().isClientSide) {
             // 1. 更新拴住状态（检测护腿装备）
             LivingEntity owner = this.getOwner();
-            boolean tethered = owner != null && isTethered(owner);
-            this.entityData.set(IS_TETHERED, tethered);
+            if (owner != null) {
+                boolean hasString = StringHelper.hasStringEquipped(owner);
+                // 检测丝线状态变化（缓存上次状态）
+                if (this.lastHasString != hasString) {
+                    if (this.lastHasString && !hasString) {
+                        // 脱下丝线：解除所有拴住
+                        List<DollEntity> dolls = owner.level().getEntitiesOfClass(DollEntity.class,
+                            owner.getBoundingBox().inflate(64.0),
+                            d -> owner.getUUID().equals(d.getOwnerUUID()) && d.isTethered()
+                        );
+                        for (DollEntity d : dolls) {
+                            d.setTethered(false);
+                        }
+                    } else if (!this.lastHasString && hasString) {
+                        // 穿上丝线：自动拴住周围最多数量的人偶
+                        // 注意：owner 必须是 Player，因为 StringHelper 需要 Player 类型
+                        if (owner instanceof Player playerOwner) {
+                            List<DollEntity> untetheredDolls = owner.level().getEntitiesOfClass(DollEntity.class,
+                                owner.getBoundingBox().inflate(64.0),
+                                d -> owner.getUUID().equals(d.getOwnerUUID()) && !d.isTethered() && d.isAlive()
+                            );
+                            int maxSlots = StringHelper.getMaxTethered(playerOwner);
+                            int currentOccupied = StringHelper.countOccupiedSlots(playerOwner);
+                            int available = maxSlots - currentOccupied;
+                            int toTether = Math.min(available, untetheredDolls.size());
+                            for (int i = 0; i < toTether; i++) {
+                                DollEntity d = untetheredDolls.get(i);
+                                d.setTethered(true);
+                            }
+                        }
+                    }
+                    this.lastHasString = hasString;
+                }
+            }
 
             // 2. 主人失明/黑暗时强制解除激怒并清空目标
             if (owner != null && (owner.hasEffect(net.minecraft.world.effect.MobEffects.BLINDNESS) ||
@@ -175,7 +211,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
             }
             
             // ===== 距离检测：强制解除激怒 =====
-            if (owner != null && tethered) {
+            if (owner != null && this.isTethered()) {
                 double distance = this.distanceTo(owner);
                 double dragForce = this.getDollData().getDragForceRange(); // 24
                 if (distance > dragForce) {
@@ -436,8 +472,17 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
     public long getEvokeTime() { return this.entityData.get(EVOKE_TIME); }
     public void setEvokeTime(long time) { this.entityData.set(EVOKE_TIME, time); }
 
-    // ========== 拴住状态 ==========
-    public boolean isTethered() { return this.entityData.get(IS_TETHERED); }
+    // ========== 拴住状态 ==========   
+        public boolean isTethered() {
+        return this.entityData.get(IS_TETHERED);
+    }
+
+    public void setTethered(boolean tethered) {
+        getDollData().setTethered(tethered);       // 持久化
+        this.entityData.set(IS_TETHERED, tethered); // 同步到客户端
+        getDollData().setOccupiesSlot(tethered);
+    }
+    
     public boolean isTethered(LivingEntity owner) {
         if (owner == null) return false;
         ItemStack leggings = owner.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.LEGS);
@@ -604,6 +649,7 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         }
         if (tag.contains("DollData")) {
             dataManager.load(tag.getCompound("DollData"), this.level().registryAccess());
+            setTethered(getDollData().isTethered());
             syncEquipmentToClient();
         } 
         if (tag.contains("IsEnraged")) {

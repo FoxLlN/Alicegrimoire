@@ -40,22 +40,10 @@ public class StringHelper {
     }
     
     /**
-     * 统计玩家当前拴住的人偶数量（仅计算占用名额的）
+     * 统计玩家当前拴住的人偶数量（即占用名额的数量）
+     * 只要人偶的 tethered 为 true，就占用名额
      */
     public static int countOccupiedSlots(Player player) {
-        List<DollEntity> dolls = player.level().getEntitiesOfClass(DollEntity.class,
-            player.getBoundingBox().inflate(64.0),
-            doll -> player.getUUID().equals(doll.getOwnerUUID()) && 
-                    doll.isTethered() && 
-                    doll.getDollData().getOccupiesSlot()
-        );
-        return dolls.size();
-    }
-    
-    /**
-     * 统计玩家当前拴住的人偶总数
-     */
-    public static int countTetheredDolls(Player player) {
         List<DollEntity> dolls = player.level().getEntitiesOfClass(DollEntity.class,
             player.getBoundingBox().inflate(64.0),
             doll -> player.getUUID().equals(doll.getOwnerUUID()) && doll.isTethered()
@@ -64,7 +52,14 @@ public class StringHelper {
     }
     
     /**
-     * 检查玩家是否还能再拴住一个人偶（考虑占用名额）
+     * 统计玩家当前拴住的人偶总数（与 countOccupiedSlots 相同）
+     */
+    public static int countTetheredDolls(Player player) {
+        return countOccupiedSlots(player);
+    }
+    
+    /**
+     * 检查玩家是否还能再拴住一个人偶
      */
     public static boolean canTetherMore(Player player) {
         int max = getMaxTethered(player);

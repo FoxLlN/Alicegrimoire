@@ -11,6 +11,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.component.CustomData;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
+import org.aliceGrimoire.alicegrimoire.event.PlayerMoveDetector;
 import org.aliceGrimoire.alicegrimoire.item.string.StringHelper;
 import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
 import org.aliceGrimoire.alicegrimoire.registry.ModEntities;
@@ -33,57 +34,39 @@ public class DollBasketItem extends Item {
         }
 
         if (!level.isClientSide) {
-            int totalInBasket = dolls.size();
-
-            // 检查是否装备了丝线
             boolean hasString = StringHelper.hasStringEquipped(player);
 
-            if (hasString) {
-                // ===== 穿着丝线：检查上限 =====
-                int availableSlots = StringHelper.getAvailableSlots(player);
-
-                if (availableSlots <= 0) {
-                    // 没有空位，直接提示，一个也不生成
-                    player.displayClientMessage(
-                        Component.translatable("message.alicegrimoire.doll_max_tethered_full"),
-                        true
-                    );
-                    return InteractionResultHolder.fail(basket);
-                }
-
-                if (totalInBasket > availableSlots) {
-                    // 篮子里的数量超过可用槽位，提示，一个也不生成
-                    player.displayClientMessage(
-                        Component.translatable("message.alicegrimoire.doll_max_tethered_batch_exceed",
-                            availableSlots, totalInBasket),
-                        true
-                    );
-                    return InteractionResultHolder.fail(basket);
-                }
-
-                // 数量足够，继续生成（全部生成后会被 tick 自动拴住）
-            }
-
-            // ===== 执行生成（不穿丝线 或 穿丝线且数量足够） =====
+            // 遍历每个人偶，逐个生成
             for (ItemStack dollStack : dolls) {
                 DollEntity doll = ModEntities.DOLL.get().create(level);
                 if (doll == null) continue;
 
+                // 加载NBT数据
                 CustomData entityData = dollStack.get(DataComponents.ENTITY_DATA);
                 if (entityData != null) {
                     doll.load(entityData.copyTag());
                 }
+
+                // 设置所有者
                 doll.setOwnerUUID(player.getUUID());
+                doll.setPlayerMoving(PlayerMoveDetector.getPlayerMoving(player.getUUID()));
                 doll.moveTo(player.getX(), player.getEyeY(), player.getZ(), player.getYRot(), player.getXRot());
-                    
+
+                // 判断是否拴住（仅在穿丝线且当前仍有空余名额时）
+                boolean tethered = false;
+                if (hasString) {
+                    tethered = StringHelper.canTetherMore(player);  // 实时检查剩余名额
+                }
+                doll.setTethered(tethered);
+
+                // 随机偏移 + 唤起动画
                 Vec3 look = player.getLookAngle();
-                // Add random offset as requested
                 double rx = (level.random.nextDouble() - 0.5) * 0.5;
                 double ry = (level.random.nextDouble() - 0.5) * 0.5;
                 double rz = (level.random.nextDouble() - 0.5) * 0.5;
-                        
                 doll.setDeltaMovement(look.scale(1.5D).add(rx, ry, rz));
                 doll.setEvokeTime(level.getGameTime());
+
                 level.addFreshEntity(doll);
             }
 
@@ -93,4 +76,5 @@ public class DollBasketItem extends Item {
 
         return InteractionResultHolder.sidedSuccess(basket, level.isClientSide());
     }
+
 }

@@ -38,7 +38,7 @@ public class DollRenderer extends GeoEntityRenderer<DollEntity> {
         
         // 7、视觉上的表现形式类似于原版的拴绳
         LivingEntity owner = entity.getOwner();
-        if (owner != null && isTethered(owner)) {
+        if (owner != null && entity.isTethered()) {
             // 指令 9：高亮的视觉效果只对玩家自己有效，其他玩家看不见
             net.minecraft.client.player.LocalPlayer localPlayer = net.minecraft.client.Minecraft.getInstance().player;
             if (localPlayer != null && localPlayer.getUUID().equals(owner.getUUID())) {
