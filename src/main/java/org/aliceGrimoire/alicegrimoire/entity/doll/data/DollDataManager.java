@@ -36,14 +36,25 @@ public class DollDataManager {
     
     // ========== 应用数据到实体 ==========
     public void applyDataToEntity() {
+        // 基础属性
         doll.getAttribute(Attributes.MAX_HEALTH)
             .setBaseValue(data.getMaxHealth());
+        
+        // 攻击力：从武器动态计算
+        float attackDamage = data.getWeaponAttackDamage();
         doll.getAttribute(Attributes.ATTACK_DAMAGE)
-            .setBaseValue(data.getDamage());
+            .setBaseValue(attackDamage);
+        
+        // 护甲：从装备的盔甲动态计算
+        int armor = data.getTotalArmor();
         doll.getAttribute(Attributes.ARMOR)
-            .setBaseValue(data.getArmor());
+            .setBaseValue(armor);
+        
+        // 护甲韧性：从装备的盔甲动态计算
+        float toughness = data.getTotalArmorToughness();
         doll.getAttribute(Attributes.ARMOR_TOUGHNESS)
-            .setBaseValue(data.getArmorToughness());
+            .setBaseValue(toughness);
+        
         doll.getAttribute(Attributes.KNOCKBACK_RESISTANCE)
             .setBaseValue(data.getKnockbackResistance());
         doll.getAttribute(Attributes.FLYING_SPEED)
@@ -134,10 +145,17 @@ public class DollDataManager {
     }
 
     public void setItem(int slot, ItemStack stack) {
+        if (!DollSlots.isValidSlot(slot)) return;
         data.setItem(slot, stack);
+        
+        // ===== 刷新属性（无论什么槽位变化，护甲/攻击力都可能改变） =====
+        applyDataToEntity();
+        
+        // 如果主手变化，需要刷新战斗策略
         if (slot == DollSlots.MAIN_HAND) {
             refreshStrategy();
         }
+        
         // 同步到客户端
         doll.syncEquipmentToClient();
     }

@@ -1,5 +1,8 @@
 package org.aliceGrimoire.alicegrimoire.entity.doll.equipment;
 
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.data.DollSlots;
@@ -22,6 +25,30 @@ public class DollEquipmentHandler {
      */
     public boolean tryEquip(ItemStack stack) {
         if (stack.isEmpty()) return false;
+        
+        Item item = stack.getItem();
+        
+        // ===== 1. 处理盔甲 =====
+        if (item instanceof ArmorItem armorItem) {
+            EquipmentSlot slot = armorItem.getEquipmentSlot();
+            int dollSlot = switch (slot) {
+                case HEAD -> DollSlots.HELMET;
+                case CHEST -> DollSlots.CHESTPLATE;
+                case LEGS -> DollSlots.LEGGINGS;
+                case FEET -> DollSlots.BOOTS;
+                default -> -1;
+            };
+            if (dollSlot == -1) return false;
+            
+            ItemStack current = doll.getDollData().getItem(dollSlot);
+            if (current.isEmpty() || armorItem.getDefense() > getArmorDefense(current)) {
+                doll.getDollData().setItem(dollSlot, stack.copyWithCount(1));
+                doll.getDataManager().applyDataToEntity();
+                doll.syncEquipmentToClient();
+                return true;
+            }
+            return false;
+        }
 
         IEquipmentStrategy strategy = EquipmentRegistry.findStrategy(stack);
         if (strategy == null) return false;
@@ -76,5 +103,12 @@ public class DollEquipmentHandler {
     public boolean hasShield() {
         return !getOffHand().isEmpty() &&
                getOffHand().getItem() instanceof net.minecraft.world.item.ShieldItem;
+    }
+
+    private int getArmorDefense(ItemStack stack) {
+        if (stack.getItem() instanceof ArmorItem armor) {
+            return armor.getDefense();
+        }
+        return 0;
     }
 }

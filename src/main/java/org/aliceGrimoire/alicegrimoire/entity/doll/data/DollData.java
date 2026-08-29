@@ -1,8 +1,11 @@
 package org.aliceGrimoire.alicegrimoire.entity.doll.data;
 
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.*;
+import net.minecraft.world.item.component.ItemAttributeModifiers;
 
 /**
  * 人偶属性数据
@@ -293,5 +296,56 @@ public class DollData {
         copy.customData = this.customData.copy();
         copy.tethered = this.tethered;
         return copy;
+    }
+
+    // ========== 人偶背包相关辅助方法 ==========
+    /**
+     * 计算所有盔甲槽位的总护甲值
+     */
+    public int getTotalArmor() {
+        int total = 0;
+        for (int slot = DollSlots.HELMET; slot <= DollSlots.BOOTS; slot++) {
+            ItemStack stack = inventory[slot];
+            if (!stack.isEmpty() && stack.getItem() instanceof ArmorItem armorItem) {
+                total += armorItem.getDefense();
+            }
+        }
+        return total;
+    }
+
+    /**
+     * 计算所有盔甲槽位的总护甲韧性
+     */
+    public float getTotalArmorToughness() {
+        float total = 0;
+        for (int slot = DollSlots.HELMET; slot <= DollSlots.BOOTS; slot++) {
+            ItemStack stack = inventory[slot];
+            if (!stack.isEmpty() && stack.getItem() instanceof ArmorItem armorItem) {
+                total += armorItem.getToughness();
+            }
+        }
+        return total;
+    }
+
+    /**
+     * 获取主手武器的攻击力加成（基础伤害 + 武器攻击力）
+     */
+    public float getWeaponAttackDamage() {
+        ItemStack weapon = getWeapon();
+        if (weapon.isEmpty()) return (float) this.damage; // 空手使用基础伤害
+        
+        // 尝试从 AttributeModifiers 中读取 ATTACK_DAMAGE
+        var modifiers = weapon.get(DataComponents.ATTRIBUTE_MODIFIERS);
+        if (modifiers != null) {
+            for (ItemAttributeModifiers.Entry entry : modifiers.modifiers()) {
+                if (entry.attribute().equals(Attributes.ATTACK_DAMAGE)) {
+                    float bonus = (float) entry.modifier().amount();
+                    return (float) this.damage + bonus;
+                }
+            }
+        }
+        
+        // 如果武器没有 ATTACK_DAMAGE 修饰符，返回基础伤害
+        return (float) this.damage;
     }
 }

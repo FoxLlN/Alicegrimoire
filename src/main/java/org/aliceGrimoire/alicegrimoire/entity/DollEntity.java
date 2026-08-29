@@ -536,8 +536,18 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                 }
             }
             this.setShieldDisableTicks(disableTime);
+        }  
+            
+        // ===== 执行伤害 =====
+        boolean result = super.hurt(source, amount);
+        
+        // ===== 如果确实受到了伤害，消耗盔甲耐久度 =====
+        if (result && !this.level().isClientSide && amount > 0) {
+            // 盔甲耐久度消耗（参考原版 LivingEntity 的实现）
+            damageArmor(source, amount);
         }
-        return super.hurt(source, amount);
+        
+        return result;
     }
 
     @Override
@@ -560,6 +570,62 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
 
     public int getShieldDisableTicks() { return shieldDisableTicks; }
     public void setShieldDisableTicks(int ticks) { this.shieldDisableTicks = ticks; }
+
+    /**
+     * 消耗人偶装备的盔甲耐久度
+     * 将伤害平均分配给所有已装备的盔甲
+     */
+    private void damageArmor(DamageSource source, float amount) {
+        if (amount <= 0) return;
+
+        // ===== 1. 统计已装备的盔甲数量 =====
+        int armorCount = 0;
+        for (int slot = DollSlots.HELMET; slot <= DollSlots.BOOTS; slot++) {
+            ItemStack stack = this.getDollData().getItem(slot);
+            if (!stack.isEmpty() && stack.isDamageableItem()) {
+                armorCount++;
+            }
+        }
+
+        // 没有可损耗的盔甲，直接返回
+        if (armorCount == 0) return;
+
+        // ===== 2. 计算每件盔甲应承受的伤害 =====
+        // 原版逻辑：总伤害 / 盔甲数量，最少为 1
+        int damagePerArmor = Math.max(1, (int) (amount / armorCount));
+
+        // ===== 3. 遍历所有盔甲槽位，消耗耐久 =====
+        for (int slot = DollSlots.HELMET; slot <= DollSlots.BOOTS; slot++) {
+            ItemStack armorStack = this.getDollData().getItem(slot);
+            if (armorStack.isEmpty() || !armorStack.isDamageableItem()) continue;
+
+            // 消耗耐久
+            armorStack.hurtAndBreak(damagePerArmor, this, getEquipmentSlotForSlot(slot));
+
+            // 如果盔甲损坏，清空该槽位
+            if (armorStack.isEmpty()) {
+                this.getDollData().setItem(slot, ItemStack.EMPTY);
+            }
+        }
+
+        // ===== 4. 护甲变化后刷新属性（可能有的盔甲损坏了） =====
+        this.getDataManager().applyDataToEntity();
+        this.syncEquipmentToClient();
+    }
+
+    /**
+     * 将 DollSlots 槽位映射到 EquipmentSlot
+     */
+    private EquipmentSlot getEquipmentSlotForSlot(int dollSlot) {
+        return switch (dollSlot) {
+            case DollSlots.HELMET -> EquipmentSlot.HEAD;
+            case DollSlots.CHESTPLATE -> EquipmentSlot.CHEST;
+            case DollSlots.LEGGINGS -> EquipmentSlot.LEGS;
+            case DollSlots.BOOTS -> EquipmentSlot.FEET;
+            default -> EquipmentSlot.MAINHAND;
+        };
+    }
+    
 
     // ========== 远程攻击 ==========
     @Override
@@ -722,6 +788,32 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
     protected void dropEquipment() {
         // 不执行默认的装备掉落逻辑
         // 所有数据已经保存在破损人偶物品中
+    }
+
+    // 消耗工具耐久度
+    @Override
+    public boolean doHurtTarget(Entity target) {
+        // 先调用父类方法完成实际伤害
+        boolean result = super.doHurtTarget(target);
+        
+        if (result && !this.level().isClientSide) {
+            // ===== 消耗主手武器耐久度 =====
+            ItemStack weapon = getItemInHand();
+            if (!weapon.isEmpty() && weapon.isDamageableItem()) {
+                // 使用原版的 hurtAndBreak 方法，会触发耐久度减少和损坏音效/粒子
+                weapon.hurtAndBreak(1, this, EquipmentSlot.MAINHAND);
+                
+                // 如果武器损坏，清空该槽位
+                if (weapon.isEmpty()) {
+                    setItemInHand(ItemStack.EMPTY);
+                    // 刷新属性（因为攻击力可能变化）
+                    this.getDataManager().applyDataToEntity();
+                    this.syncEquipmentToClient();
+                }
+            }
+        }
+        
+        return result;
     }
 
     // ========== GeckoLib 接口 ==========
