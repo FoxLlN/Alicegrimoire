@@ -1,0 +1,41 @@
+{
+	"format_version": "1.21.0",
+	"minecraft:geometry": [
+		{
+			"description": {
+				"identifier": "geometry.doll_basket",
+				"texture_width": 64,
+				"texture_height": 64,
+				"visible_bounds_width": 2,
+				"visible_bounds_height": 2.5,
+				"visible_bounds_offset": [0, 0.75, 0]
+			},
+			"bones": [
+				{
+					"name": "all",
+					"pivot": [0, 0, 0],
+					"cubes": [
+						{"origin": [-8, 6, -6], "size": [1, 2, 12], "uv": [36, 33]},
+						{"origin": [7, 6, -6], "size": [1, 2, 12], "uv": [36, 33]},
+						{"origin": [-7, 6, -6], "size": [14, 2, 1], "uv": [34, 53]},
+						{"origin": [-7, 6, 5], "size": [14, 2, 1], "uv": [34, 53]},
+						{
+							"origin": [-7, 0, -5],
+							"size": [14, 6, 10],
+							"uv": {
+								"north": {"uv": [10, 24], "uv_size": [14, 6]},
+								"east": {"uv": [24, 24], "uv_size": [10, 6]},
+								"south": {"uv": [10, 24], "uv_size": [14, 6]},
+								"west": {"uv": [24, 24], "uv_size": [10, 6]},
+								"up": {"uv": [10, 14], "uv_size": [14, 10]},
+								"down": {"uv": [24, 24], "uv_size": [14, -10]}
+							}
+						},
+						{"origin": [-5, 7, -5], "size": [2, 7, 10], "inflate": 0.01, "pivot": [-4, 8, 0], "rotation": [0, 0, 32.5], "uv": [3, 40]},
+						{"origin": [3, 7, -5], "size": [2, 7, 10], "inflate": 0.01, "pivot": [4, 8, 0], "rotation": [0, 0, -32.5], "uv": [3, 40], "mirror": true}
+					]
+				}
+			]
+		}
+	]
+}

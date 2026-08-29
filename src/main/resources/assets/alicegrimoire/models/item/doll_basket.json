@@ -1,6 +1,37 @@
 {
-  "parent": "minecraft:item/generated",
-  "textures": {
-    "layer0": "alicegrimoire:item/doll_basket"
+  "credit": "Made with Blockbench",
+  "parent": "builtin/entity",
+  "display": {
+    "firstperson_righthand": {
+      "translation": [
+        0,
+        -3.0,
+        0
+      ]
+    },
+    "firstperson_lefthand": {
+      "translation": [
+        0,
+        -3.0,
+        0
+      ]
+    },
+    "gui": {
+      "rotation": [
+        33.0,
+        51.0,
+        0.0
+      ],
+      "translation": [
+        0.0,
+        -3.0,
+        0.0
+      ],
+      "scale": [
+        0.8,
+        0.8,
+        0.8
+      ]
+    }
   }
 }

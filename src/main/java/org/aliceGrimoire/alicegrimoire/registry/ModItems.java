@@ -33,4 +33,7 @@ public class ModItems {
         
     public static final DeferredItem<Item> DOLL = ITEMS.register("doll", 
         () -> new DollItem(ModBlocks.DOLL.get(), new Item.Properties().stacksTo(1)));
+
+    public static final DeferredItem<Item> BROKEN_DOLL = ITEMS.register("broken_doll", 
+        () -> new BrokenDollItem(new Item.Properties().stacksTo(1)));
 }

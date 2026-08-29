@@ -1,4 +1,37 @@
 {
+  "credit": "Made with Blockbench",
   "parent": "builtin/entity",
-  "gui_light": "front"
+  "display": {
+    "firstperson_righthand": {
+      "translation": [
+        0,
+        -3.0,
+        0
+      ]
+    },
+    "firstperson_lefthand": {
+      "translation": [
+        0,
+        -3.0,
+        0
+      ]
+    },
+    "gui": {
+      "rotation": [
+        33.0,
+        51.0,
+        0.0
+      ],
+      "translation": [
+        0.0,
+        -3.0,
+        0.0
+      ],
+      "scale": [
+        0.6,
+        0.6,
+        0.6
+      ]
+    }
+  }
 }

@@ -1,5 +1,6 @@
 package org.aliceGrimoire.alicegrimoire.item;
 
+import net.minecraft.client.renderer.BlockEntityWithoutLevelRenderer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
@@ -9,19 +10,62 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.world.item.component.CustomData;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
+import org.aliceGrimoire.alicegrimoire.client.AliceGeoModel;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.event.PlayerMoveDetector;
 import org.aliceGrimoire.alicegrimoire.item.string.StringHelper;
 import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
 import org.aliceGrimoire.alicegrimoire.registry.ModEntities;
+import software.bernie.geckolib.animatable.GeoItem;
+import software.bernie.geckolib.animatable.instance.AnimatableInstanceCache;
+import software.bernie.geckolib.animation.AnimatableManager;
+import software.bernie.geckolib.renderer.GeoItemRenderer;
+import software.bernie.geckolib.util.GeckoLibUtil;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
-public class DollBasketItem extends Item {
+public class DollBasketItem extends Item implements GeoItem {
+
+    private final AnimatableInstanceCache cache = GeckoLibUtil.createInstanceCache(this);
+
     public DollBasketItem(Properties properties) {
         super(properties);
     }
+
+    // ========== GeoItem 接口实现 ==========
+
+    @Override
+    public void registerControllers(AnimatableManager.ControllerRegistrar controllers) {
+        // 若后续需要动画，可在此添加；目前无动画，留空
+    }
+
+    @Override
+    public AnimatableInstanceCache getAnimatableInstanceCache() {
+        return cache;
+    }
+
+    @Override
+    public void initializeClient(Consumer<IClientItemExtensions> consumer) {
+        consumer.accept(new IClientItemExtensions() {
+            private GeoItemRenderer<DollBasketItem> renderer;
+
+            @Override
+            public BlockEntityWithoutLevelRenderer getCustomRenderer() {
+                if (renderer == null) {
+                    renderer = new GeoItemRenderer<>(new AliceGeoModel<>(
+                            "geo/doll_basket.geo.json",          // 模型文件
+                            "textures/item/doll_basket.png",     // 纹理文件
+                            "animations/doll_basket.animation.json" // 动画文件（可空占位）
+                    ));
+                }
+                return renderer;
+            }
+        });
+    }
+
+    // ========== 原有业务逻辑保持不变 ==========
 
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
@@ -69,8 +113,7 @@ public class DollBasketItem extends Item {
                 level.addFreshEntity(doll);
             }
 
-            // 清空篮子
-            basket.set(ModDataComponents.DOLLS.get(), new ArrayList<>());
+            basket.set(ModDataComponents.DOLLS.get(), List.of()); // 清空篮子
         }
 
         return InteractionResultHolder.sidedSuccess(basket, level.isClientSide());

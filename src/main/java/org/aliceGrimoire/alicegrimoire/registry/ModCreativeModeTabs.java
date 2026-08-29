@@ -23,6 +23,7 @@ public class ModCreativeModeTabs {
                 output.accept(ModItems.DOLL_STRING.get());
                 output.accept(ModItems.DOLL_BASKET.get());
                 output.accept(ModItems.DOLL_WHISTLE.get());
+                output.accept(ModItems.BROKEN_DOLL.get());
                 
                 for (DollJobType type : DollJobType.values()) {
                     ItemStack stack = new ItemStack(ModItems.DOLL.get());

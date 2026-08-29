@@ -1,5 +1,6 @@
 package org.aliceGrimoire.alicegrimoire.entity;
 
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -19,6 +20,7 @@ import net.minecraft.world.entity.projectile.Arrow;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.ShieldItem;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
@@ -32,6 +34,8 @@ import org.aliceGrimoire.alicegrimoire.entity.doll.movement.DollMoveControl;
 import org.aliceGrimoire.alicegrimoire.entity.doll.movement.DollMovementHandler;
 import org.aliceGrimoire.alicegrimoire.entity.doll.util.DollCollisionHelper;
 import org.aliceGrimoire.alicegrimoire.item.string.StringHelper;
+import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
+import org.aliceGrimoire.alicegrimoire.registry.ModItems;
 import org.jetbrains.annotations.Nullable;
 
 import com.mojang.logging.LogUtils;
@@ -655,6 +659,69 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         if (tag.contains("IsEnraged")) {
             this.setEnraged(tag.getBoolean("IsEnraged"));
         }
+    }
+
+    // ========== 死亡管理 ==========
+    @Override
+    public void die(DamageSource source) {
+        // 记录死亡位置和掉落信息
+        if (!this.level().isClientSide) {
+            // 生成破损人偶物品
+            ItemStack brokenDollStack = createBrokenDollItem();
+            
+            // 作为掉落物生成
+            this.spawnAtLocation(brokenDollStack, 1.0F);
+            
+            // 生成一些粒子效果
+            this.level().addParticle(
+                net.minecraft.core.particles.ParticleTypes.POOF,
+                this.getX(), this.getY() + 0.5, this.getZ(),
+                0, 0.1, 0
+            );
+        }
+        
+        // 调用父类方法完成死亡流程
+        super.die(source);
+    }
+
+    /**
+     * 创建破损人偶物品，保存当前所有人偶数据
+     */
+
+    private ItemStack createBrokenDollItem() {
+        ItemStack stack = new ItemStack(ModItems.BROKEN_DOLL.get());
+
+        CompoundTag entityTag = new CompoundTag();
+        this.saveWithoutId(entityTag);
+
+        // ===== 修复点：手动补全实体 ID =====
+        entityTag.putString("id", EntityType.getKey(this.getType()).toString());
+
+        // 确保破损标记
+        if (entityTag.contains("DollData")) {
+            entityTag.getCompound("DollData").putBoolean("IsBroken", true);
+        } else {
+            CompoundTag dollData = this.getDataManager().save(this.level().registryAccess());
+            dollData.putBoolean("IsBroken", true);
+            entityTag.put("DollData", dollData);
+        }
+        entityTag.putBoolean("IsBroken", true);
+        entityTag.remove("UUID");
+
+        stack.set(DataComponents.ENTITY_DATA, CustomData.of(entityTag));
+
+        DollJobType jobType = this.getJobType();
+        if (jobType != null) {
+            stack.set(ModDataComponents.DOLL_TYPE.get(), jobType);
+        }
+
+        return stack;
+    }
+    
+    @Override
+    protected void dropEquipment() {
+        // 不执行默认的装备掉落逻辑
+        // 所有数据已经保存在破损人偶物品中
     }
 
     // ========== GeckoLib 接口 ==========

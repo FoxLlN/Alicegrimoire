@@ -1,5 +1,6 @@
 {
   "itemGroup.alicegrimoire": "爱丽丝魔典",
+  "item.alicegrimoire.broken_doll": "破损人偶",
   "item.alicegrimoire.magiweaver": "织魔台",
   "item.alicegrimoire.doll_baton": "人偶指挥棒",
   "item.alicegrimoire.doll_net": "人偶网",
@@ -41,5 +42,14 @@
 
   "message.alicegrimoire.doll_too_far": "人偶距离过远，无法攻击",
   "message.alicegrimoire.doll_max_tethered_full": "人偶已达到最大拴住数量，无法拴住更多人偶",
-  "message.alicegrimoire.doll_max_tethered_batch_exceed": "批量拴住人偶数量超过限制，拴住 %d/%d 个人偶"
+  "message.alicegrimoire.doll_max_tethered_batch_exceed": "批量拴住人偶数量超过限制，拴住 %d/%d 个人偶",
+
+  "tooltip.alicegrimoire.broken_doll": "§c破损状态 §7- 需要修复才能使用",
+  "tooltip.alicegrimoire.broken_doll.former_job": "原职业: %s",
+  "tooltip.alicegrimoire.broken_doll.former_health": "原生命值: %s",
+  "tooltip.alicegrimoire.broken_doll.repair_hint": "§e在织魔台中使用复活信物修复",
+  "message.alicegrimoire.broken_doll_cannot_summon": "破损的人偶无法召唤，请先修复！",
+  "message.alicegrimoire.doll_repaired": "人偶修复完成！",
+  "message.alicegrimoire.doll_repair_failed": "修复失败：缺少修复材料！",
+  "gui.alicegrimoire.repair": "修复"
 }
