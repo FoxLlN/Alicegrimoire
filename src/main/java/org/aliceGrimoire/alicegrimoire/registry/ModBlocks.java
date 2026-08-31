@@ -17,4 +17,7 @@ public class ModBlocks {
     
     public static final DeferredBlock<Block> DOLL = BLOCKS.register("doll", 
         () -> new DollBlock(BlockBehaviour.Properties.of().strength(0.1f).noOcclusion()));
+
+    public class BLOCKS {
+    }
 }

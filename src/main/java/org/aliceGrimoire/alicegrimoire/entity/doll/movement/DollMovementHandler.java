@@ -37,6 +37,17 @@ public class DollMovementHandler {
      * 每帧调用，根据当前状态设置移动目标。
      */
     public void tick() {
+        // ===== 人偶哨：不主动移动状态 =====
+        if (doll.getNoMovementTicks() > 0) {
+            // 不主动移动，但可以被拴绳拖动
+            // 强制清除移动目标
+            doll.getMoveControl().setWantedPosition(
+                doll.getX(), doll.getY(), doll.getZ(), 0
+            );
+            doll.setDeltaMovement(Vec3.ZERO);
+            return; // 跳过其他移动逻辑
+        }
+
         DollState state = stateManager.getCurrentState();
         LivingEntity owner = doll.getOwner();
 
@@ -194,6 +205,11 @@ public class DollMovementHandler {
      */
     public void followOwner(DollEntity doll, LivingEntity owner, double speedMultiplier, double desiredDistance) {
         if (owner == null) return;
+
+        // 如果处于不移动状态，不执行跟随逻辑
+        if (doll.getNoMovementTicks() > 0) {
+            return;
+        }
         
         double dx = doll.getX() - owner.getX();
         double dz = doll.getZ() - owner.getZ();

@@ -146,6 +146,14 @@ public class DollDataManager {
 
     public void setItem(int slot, ItemStack stack) {
         if (!DollSlots.isValidSlot(slot)) return;
+        // ===== 检查背包槽位是否超出当前可用容量 =====
+        if (DollSlots.isBackpackSlot(slot)) {
+            int backpackIndex = slot - DollSlots.BACKPACK_START;
+            if (backpackIndex >= data.getBackpackSlots()) {
+                return; // 超出可用背包格数，拒绝放入
+            }
+        }
+        
         data.setItem(slot, stack);
         
         // ===== 刷新属性（无论什么槽位变化，护甲/攻击力都可能改变） =====

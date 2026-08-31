@@ -47,6 +47,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Comparator;
 import java.util.List;
 
 public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntity, RangedAttackMob {
@@ -67,6 +68,8 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
     private boolean isReturning = false;
     // 激怒时间（用于发光等）
     private long enrageTime = 0;
+    // 不主动移动的剩余 tick 数（人偶哨使用）
+    private int noMovementTicks = 0;
 
     // 平滑目标Y坐标（用于人偶跟随目标高度时的平滑滤波）
     private double smoothedTargetY = Double.NaN;
@@ -232,6 +235,20 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                 }
             }
 
+            if (noMovementTicks > 0) {
+                noMovementTicks--;
+                // 如果还在不移动状态，清除移动目标
+                if (noMovementTicks > 0) {
+                    this.getMoveControl().setWantedPosition(
+                        this.getX(), this.getY(), this.getZ(), 0
+                    );
+                    this.setDeltaMovement(Vec3.ZERO);
+                } else {
+                    // 不移动状态结束，自动退出返回模式
+                    this.setReturning(false);
+                }
+            }
+
             // 3. 状态机更新
             stateManager.tick();
             
@@ -250,18 +267,19 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                 }
             }
             
-            // 7. 每 5 tick（0.25秒）检测一次周围的物品
+            // 拾取掉落物（每5 tick检测一次）
             if (this.tickCount % 5 == 0) {
-                var items = this.level().getEntitiesOfClass(ItemEntity.class, this.getBoundingBox().inflate(1.5));
+                double pickupRange = this.getDollData().getPickupRange();
+                List<ItemEntity> items = this.level().getEntitiesOfClass(
+                    ItemEntity.class,
+                    this.getBoundingBox().inflate(pickupRange),
+                    item -> !item.hasPickUpDelay() && item.isAlive() && !item.getItem().isEmpty()
+                );
+                // 按距离排序，优先拾取最近的
+                items.sort(Comparator.comparingDouble(e -> e.distanceToSqr(this)));
                 for (ItemEntity itemEntity : items) {
-                    ItemStack stack = itemEntity.getItem();
-                    if (this.equipmentHandler.tryEquip(stack)) {
-                        stack.shrink(1);
-                        if (stack.isEmpty()) {
-                            itemEntity.discard();
-                        }
-                        // LOGGER.info("人偶 {} 拾取了物品 {}", this.getDisplayName().getString(), stack.getDisplayName().getString());
-                        break; // 一次只捡一个
+                    if (tryPickupItem(itemEntity)) {
+                        break; // 一次只捡一个（与玩家行为一致，也可连续捡多个，但每5 tick足够）
                     }
                 }
             }
@@ -345,6 +363,82 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
     @Override
     public boolean isEffectiveAi() {
         return super.isEffectiveAi();
+    }
+
+    public int getNoMovementTicks() {
+        return noMovementTicks;
+    }
+
+    public void setNoMovementTicks(int ticks) {
+        this.noMovementTicks = ticks;
+        if (ticks > 0) {
+            // 开始不移动状态时，清除所有速度
+            this.setDeltaMovement(Vec3.ZERO);
+        }
+    }
+
+    /**
+     * 尝试拾取一个物品实体，放入背包，若背包满则尝试自动装备。
+     * @return true 如果成功拾取（物品被消耗）
+     */
+    private boolean tryPickupItem(ItemEntity itemEntity) {
+        ItemStack stack = itemEntity.getItem();
+        if (stack.isEmpty()) return false;
+
+        // ===== 1. 先尝试合并到已有的背包物品 =====
+        int backpackStart = DollSlots.BACKPACK_START;
+        int backpackEnd = backpackStart + this.getDollData().getBackpackSlots();
+        for (int i = backpackStart; i < backpackEnd; i++) {
+            ItemStack existing = this.getDollData().getItem(i);
+            if (!existing.isEmpty() && ItemStack.isSameItemSameComponents(existing, stack)) {
+                int maxStack = existing.getMaxStackSize();
+                int space = maxStack - existing.getCount();
+                if (space > 0) {
+                    int toAdd = Math.min(space, stack.getCount());
+                    existing.grow(toAdd);
+                    stack.shrink(toAdd);
+                    if (stack.isEmpty()) {
+                        itemEntity.discard();
+                        this.getDataManager().applyDataToEntity(); // 刷新数据（可选）
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // ===== 2. 寻找空背包槽位 =====
+        for (int i = backpackStart; i < backpackEnd; i++) {
+            if (this.getDollData().getItem(i).isEmpty()) {
+                // 复制一份（取1个）
+                ItemStack toPlace = stack.copy();
+                toPlace.setCount(1);
+                this.getDataManager().setItem(i, toPlace);
+                stack.shrink(1);
+                if (stack.isEmpty()) {
+                    itemEntity.discard();
+                    return true;
+                }
+                // 如果还有剩余，继续尝试合并或放其他槽
+                // 但本次只拾取一个物品，所以我们break并返回true，剩余会留在原地
+                // 但为了效率，我们可以继续循环，但这里先只处理一个物品
+                // 我们可以选择继续，但为了简洁，我们返回true表示已消耗1个
+                // 注意：如果stack还有剩余，itemEntity仍存在，下次tick再拾取
+                return true;
+            }
+        }
+
+        // ===== 3. 背包满，尝试自动装备（仅当物品可装备到主手/副手/盔甲） =====
+        // 使用已有的 equipmentHandler.tryEquip
+        boolean equipped = this.equipmentHandler.tryEquip(stack);
+        if (equipped) {
+            stack.shrink(1);
+            if (stack.isEmpty()) {
+                itemEntity.discard();
+            }
+            return true;
+        }
+        // ===== 4. 无法拾取 =====
+        return false;
     }
 
     // ========== 目标选择（注册Goal） ==========
@@ -908,4 +1002,50 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         getDataManager().setItem(DollSlots.OFF_HAND, stack);
     }
     
+    /**
+     * 打印人偶所有槽位的物品信息到玩家的聊天框
+     */
+    public void printInventory(Player player) {
+        player.sendSystemMessage(Component.literal("§6=== 人偶背包 ==="));
+        DollData data = this.getDollData();
+        ItemStack[] inv = data.getInventory();
+        boolean hasItems = false;
+
+        for (int i = 0; i < inv.length; i++) {
+            ItemStack stack = inv[i];
+            if (!stack.isEmpty()) {
+                hasItems = true;
+                String slotName = getSlotDisplayName(i);
+                player.sendSystemMessage(Component.literal(
+                    String.format("§7[%s] §r%s §7x§f%d", slotName, stack.getDisplayName().getString(), stack.getCount())
+                ));
+            }
+        }
+
+        if (!hasItems) {
+            player.sendSystemMessage(Component.literal("§7背包为空"));
+        }
+    }
+
+    /**
+     * 根据槽位索引返回可读的名称
+     */
+    private String getSlotDisplayName(int slot) {
+        if (slot == DollSlots.MAIN_HAND) return "主手";
+        if (slot == DollSlots.OFF_HAND) return "副手";
+        if (slot >= DollSlots.HELMET && slot <= DollSlots.BOOTS) {
+            String[] armor = {"头盔", "胸甲", "护腿", "靴子"};
+            return armor[slot - DollSlots.HELMET];
+        }
+        if (DollSlots.isBackpackSlot(slot)) {
+            int index = slot - DollSlots.BACKPACK_START;
+            int maxSlots = this.getDollData().getBackpackSlots();
+            if (index < maxSlots) {
+                return "背包" + (index + 1);
+            } else {
+                return "背包(已禁用)";
+            }
+        }
+        return "槽" + slot;
+    }
 }

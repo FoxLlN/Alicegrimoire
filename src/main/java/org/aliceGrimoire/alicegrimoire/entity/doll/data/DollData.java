@@ -56,6 +56,8 @@ public class DollData {
     private CompoundTag customData;       // 自定义数据 (未来扩展)
 
     // ========== 背包装备 ==========
+    private int backpackSlots = 9;          // 当前背包可用格数（默认9）
+    private double pickupRange = 2.0;       // 拾取掉落物范围（格）
     private ItemStack[] inventory = new ItemStack[DollSlots.INVENTORY_SIZE];
 
     // ========== 战斗参数 ==========
@@ -140,6 +142,12 @@ public class DollData {
     public DollJobType getJobType() { return jobType; }
     public void setJobType(DollJobType jobType) { this.jobType = jobType; }
     
+    public int getBackpackSlots() { return backpackSlots; }
+    public void setBackpackSlots(int slots) { this.backpackSlots = Math.min(slots, DollSlots.MAX_BACKPACK_SLOTS); }
+
+    public double getPickupRange() { return pickupRange; }
+    public void setPickupRange(double range) { this.pickupRange = Math.max(0.5, range); }
+    
     public ItemStack getItem(int slot) {
         if (!DollSlots.isValidSlot(slot)) return ItemStack.EMPTY;
         return inventory[slot];
@@ -216,6 +224,8 @@ public class DollData {
         tag.putInt("EyeColor", eyeColor);
         tag.putInt("RibbonColor", ribbonColor);
         tag.put("CustomData", customData);
+        tag.putInt("BackpackSlots", backpackSlots);
+        tag.putDouble("PickupRange", pickupRange);
 
         // 保存物品栏
         CompoundTag invTag = new CompoundTag();
@@ -256,6 +266,8 @@ public class DollData {
         this.eyeColor = tag.getInt("EyeColor");
         this.ribbonColor = tag.getInt("RibbonColor");
         this.customData = tag.getCompound("CustomData");
+        this.backpackSlots = tag.getInt("BackpackSlots");
+        this.pickupRange = tag.getDouble("PickupRange");
 
         // 加载物品栏
         if (tag.contains("Inventory")) {
@@ -292,6 +304,8 @@ public class DollData {
                 copy.inventory[i] = inventory[i].copy();
             }
         }
+        copy.backpackSlots = this.backpackSlots;
+        copy.pickupRange = this.pickupRange;
         copy.isBroken = this.isBroken;
         copy.customData = this.customData.copy();
         copy.tethered = this.tethered;
