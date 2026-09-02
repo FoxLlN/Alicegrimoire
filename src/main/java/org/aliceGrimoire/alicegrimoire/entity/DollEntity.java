@@ -33,6 +33,7 @@ import org.aliceGrimoire.alicegrimoire.entity.doll.combat.DollTargetSelector;
 import org.aliceGrimoire.alicegrimoire.entity.doll.movement.DollMoveControl;
 import org.aliceGrimoire.alicegrimoire.entity.doll.movement.DollMovementHandler;
 import org.aliceGrimoire.alicegrimoire.entity.doll.util.DollCollisionHelper;
+import org.aliceGrimoire.alicegrimoire.event.PlayerMoveDetector;
 import org.aliceGrimoire.alicegrimoire.item.string.StringHelper;
 import org.aliceGrimoire.alicegrimoire.registry.ModDataComponents;
 import org.aliceGrimoire.alicegrimoire.registry.ModItems;
@@ -47,6 +48,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
@@ -134,12 +136,17 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         if (!this.level().isClientSide) {
             // 1. 更新拴住状态（检测护腿装备）
             LivingEntity owner = this.getOwner();
+            if (owner instanceof Player player) {
+                boolean moving = PlayerMoveDetector.getPlayerMoving(player.getUUID());
+                this.isPlayerMoving = moving; // 直接赋值
+            }
+
             if (owner != null) {
                 boolean hasString = StringHelper.hasStringEquipped(owner);
                 // 检测丝线状态变化（缓存上次状态）
                 if (this.lastHasString != hasString) {
                     if (this.lastHasString && !hasString) {
-                        // 脱下丝线：解除所有拴住
+                        // ===== 脱下丝线：解除所有拴住 =====
                         List<DollEntity> dolls = owner.level().getEntitiesOfClass(DollEntity.class,
                             owner.getBoundingBox().inflate(64.0),
                             d -> owner.getUUID().equals(d.getOwnerUUID()) && d.isTethered()
@@ -148,20 +155,26 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                             d.setTethered(false);
                         }
                     } else if (!this.lastHasString && hasString) {
-                        // 穿上丝线：自动拴住周围最多数量的人偶
-                        // 注意：owner 必须是 Player，因为 StringHelper 需要 Player 类型
+                        // ===== 穿上丝线：自动拴住周围最多数量的人偶 =====
                         if (owner instanceof Player playerOwner) {
+                            // 先收集所有需要拴住的人偶（延迟执行）
                             List<DollEntity> untetheredDolls = owner.level().getEntitiesOfClass(DollEntity.class,
                                 owner.getBoundingBox().inflate(64.0),
                                 d -> owner.getUUID().equals(d.getOwnerUUID()) && !d.isTethered() && d.isAlive()
                             );
+                            
                             int maxSlots = StringHelper.getMaxTethered(playerOwner);
                             int currentOccupied = StringHelper.countOccupiedSlots(playerOwner);
                             int available = maxSlots - currentOccupied;
                             int toTether = Math.min(available, untetheredDolls.size());
-                            for (int i = 0; i < toTether; i++) {
-                                DollEntity d = untetheredDolls.get(i);
-                                d.setTethered(true);
+                            
+                            // 避免在循环中修改列表导致 ConcurrentModificationException
+                            if (toTether > 0) {
+                                // 复制一份需要拴住的人偶列表，防止在 setTethered 过程中列表被修改
+                                List<DollEntity> toTetherList = new ArrayList<>(untetheredDolls.subList(0, toTether));
+                                for (DollEntity d : toTetherList) {
+                                    d.setTethered(true);
+                                }
                             }
                         }
                     }

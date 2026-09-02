@@ -332,5 +332,9 @@ public class GuardStrategy implements ICombatStrategy {
         this.attackCooldown = 0;
         this.waitDuration = 40 + RANDOM.nextInt(20);
         this.lastHealth = -1;
+        // 重置反应策略
+        if (this.reactionStrategy != null) {
+            this.reactionStrategy.reset();
+        }
     }
 }

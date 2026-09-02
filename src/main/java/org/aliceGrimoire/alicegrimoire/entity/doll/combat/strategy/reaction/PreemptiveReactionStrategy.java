@@ -47,4 +47,12 @@ public class PreemptiveReactionStrategy implements IDamageReactionStrategy {
     public String getName() {
         return "预判闪避（提前闪避攻击）";
     }
+    
+    /**
+     * 重置状态
+     */
+    @Override
+    public void reset() {
+        this.attackDetectCounter = 0;
+    }
 }

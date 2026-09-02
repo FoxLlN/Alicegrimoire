@@ -162,6 +162,7 @@ public class SharpshooterStrategy implements ICombatStrategy {
     }
 
     private Vec3 checkAndClimbObstacle(DollEntity doll, Vec3 from, Vec3 to) {
+        if (doll.tickCount % 5 != 0) return to; // 降频
         Vec3 dir = to.subtract(from);
         double length = dir.length();
         if (length < 0.1) return to;

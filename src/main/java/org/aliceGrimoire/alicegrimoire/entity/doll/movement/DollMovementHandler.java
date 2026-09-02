@@ -216,7 +216,7 @@ public class DollMovementHandler {
         double horizontalDist = Math.sqrt(dx * dx + dz * dz);
         
         // 如果在理想距离范围内，仅做随机飘动
-        if (Math.abs(horizontalDist - desiredDistance) < 0.5) {
+        if (Math.abs(horizontalDist - desiredDistance) < 1.0) {
             if (doll.tickCount % 20 == 0) {
                 double angle = RANDOM.nextDouble() * 2 * Math.PI;
                 Vec3 randomOffset = new Vec3(Math.cos(angle) * 0.5, 0, Math.sin(angle) * 0.5);

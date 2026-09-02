@@ -32,4 +32,13 @@ public interface IDamageReactionStrategy {
     default String getName() {
         return "default";
     }
+    
+    /**
+     * 重置策略内部状态
+     * 当人偶切换目标或重新进入 STICKING 阶段时调用
+     * 默认实现为空，子类按需覆盖
+     */
+    default void reset() {
+        // 默认无操作
+    }
 }

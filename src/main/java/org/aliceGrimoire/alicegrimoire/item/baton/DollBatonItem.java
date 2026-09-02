@@ -79,10 +79,16 @@ public class DollBatonItem extends SwordItem implements GeoItem {
         Level level = player.level();
 
         // 直接使用预选目标
-        LivingEntity target = DollBatonHandler.getCurrentTarget();
+        LivingEntity target = DollBatonHandler.getCurrentTarget(player);
 
         if (target == null) {
             player.displayClientMessage(Component.translatable("message.alicegrimoire.doll_no_target"), true);
+            return;
+        }
+
+
+        if (player.distanceTo(target) > 16.0) {
+            player.displayClientMessage(Component.translatable("message.alicegrimoire.target_too_far"), true);
             return;
         }
 
@@ -185,7 +191,7 @@ public class DollBatonItem extends SwordItem implements GeoItem {
                 }
             }
             player.setData(ModAttachments.MARKED_TARGETS, new HashSet<>());
-            DollBatonHandler.clearTargetGlow();
+            DollBatonHandler.clearTargetGlow(player);
             if (count > 0) {
                 player.displayClientMessage(Component.translatable("message.alicegrimoire.doll_stop_attack_all", count), true);
             } else {
@@ -193,7 +199,7 @@ public class DollBatonItem extends SwordItem implements GeoItem {
             }
         } else {
             // 普通右键：精准解除
-            LivingEntity target = DollBatonHandler.getCurrentTarget();
+            LivingEntity target = DollBatonHandler.getCurrentTarget(player);
             if (target == null) {
                 player.displayClientMessage(Component.translatable("message.alicegrimoire.doll_no_target"), true);
                 return;

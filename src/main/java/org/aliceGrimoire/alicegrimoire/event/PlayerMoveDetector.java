@@ -6,14 +6,16 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import org.aliceGrimoire.alicegrimoire.Alicegrimoire;
-import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 玩家移动检测器
@@ -24,13 +26,19 @@ public class PlayerMoveDetector {
     private static final Logger LOGGER = LoggerFactory.getLogger(PlayerMoveDetector.class);
     
     // 缓存每个玩家的上一次位置
-    private static final Map<UUID, Vec3> lastPositions = new HashMap<>();
+     private static final Cache<UUID, Vec3> lastPositions = CacheBuilder.newBuilder()
+            .expireAfterWrite(5, TimeUnit.SECONDS)
+            .build();
     
     // 缓存每个玩家的移动状态（避免频繁查询人偶）
-    private static final Map<UUID, Boolean> playerMovingCache = new HashMap<>();
+    private static final Cache<UUID, Boolean> playerMovingCache = CacheBuilder.newBuilder()
+            .expireAfterWrite(5, TimeUnit.SECONDS)
+            .build();
 
     // 缓存每个玩家的实际速度（格/tick）
-    private static final Map<UUID, Double> playerSpeedCache = new HashMap<>();
+    private static final Cache<UUID, Double> playerSpeedCache = CacheBuilder.newBuilder()
+            .expireAfterWrite(5, TimeUnit.SECONDS)
+            .build();
 
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Pre event) {
@@ -44,7 +52,7 @@ public class PlayerMoveDetector {
         Vec3 currentPos = player.position();
         
         // 获取上一次位置
-        Vec3 lastPos = lastPositions.get(playerId);
+        Vec3 lastPos = lastPositions.getIfPresent(playerId);
         
         boolean isMoving = false;
         double speed = 0.0;
@@ -67,13 +75,10 @@ public class PlayerMoveDetector {
         playerSpeedCache.put(playerId, speed);
         
         // 如果移动状态发生变化，通知所有人偶
-        Boolean cachedMoving = playerMovingCache.get(playerId);
+        Boolean cachedMoving = playerMovingCache.getIfPresent(playerId);
         if (cachedMoving == null || cachedMoving != isMoving) {
             playerMovingCache.put(playerId, isMoving);
-            
-            // 更新该玩家拥有的所有人偶的移动状态
-            updateDollsMovingState(player, isMoving);
-            
+                        
             // 调试日志（可选，正常使用时可注释掉）
             if (isMoving) {
                 LOGGER.debug("[PlayerMove] Player {} is moving", player.getName().getString());
@@ -82,26 +87,11 @@ public class PlayerMoveDetector {
     }
 
     /**
-     * 更新玩家拥有的所有人偶的移动状态
-     */
-    private static void updateDollsMovingState(Player player, boolean isMoving) {
-        // 获取玩家周围 64 格内的所有人偶
-        List<DollEntity> dolls = player.level().getEntitiesOfClass(
-            DollEntity.class,
-            player.getBoundingBox().inflate(64.0D),
-            doll -> player.getUUID().equals(doll.getOwnerUUID())
-        );
-        
-        for (DollEntity doll : dolls) {
-            doll.setPlayerMoving(isMoving);
-        }
-    }
-
-    /**
      * 获取玩家的移动状态
      */
     public static boolean getPlayerMoving(UUID playerId) {
-        return playerMovingCache.getOrDefault(playerId, false);
+        Boolean val = playerMovingCache.getIfPresent(playerId);
+        return val != null && val;
     }
 
     /**
@@ -109,15 +99,16 @@ public class PlayerMoveDetector {
      * 供 DollMovementHandler 调用
      */
     public static double getPlayerSpeed(UUID playerId) {
-        return playerSpeedCache.getOrDefault(playerId, 0.0);
+        Double val = playerSpeedCache.getIfPresent(playerId);
+        return val == null ? 0.0 : val;
     }
 
     /**
      * 玩家登出时清理缓存
      */
     public static void onPlayerLoggedOut(UUID playerId) {
-        lastPositions.remove(playerId);
-        playerMovingCache.remove(playerId);
-        playerSpeedCache.remove(playerId);
+        lastPositions.invalidate(playerId);
+        playerMovingCache.invalidate(playerId);
+        playerSpeedCache.invalidate(playerId);
     }
 }

@@ -284,6 +284,17 @@ public class DollData {
         if (tag.contains("CombatParams")) {
             combatParams.load(tag.getCompound("CombatParams"), registries);
         }
+
+        // 【安全修复】钳制数值防止恶意溢出
+        this.maxHealth = Math.max(1, Math.min(200.0, this.maxHealth));
+        this.armor = Math.max(0, Math.min(30, this.armor));
+        this.damage = Math.max(0, Math.min(50.0, this.damage));
+        this.armorToughness = Math.max(0, Math.min(10.0, this.armorToughness));
+        this.followSpeedMultiplier = Math.max(0.5, Math.min(3.0, this.followSpeedMultiplier));
+        this.strikeSpeedMultiplier = Math.max(0.5, Math.min(3.0, this.strikeSpeedMultiplier));
+        this.wanderSpeed = Math.max(0.01, Math.min(1.0, this.wanderSpeed));
+        this.flightSpeed = Math.max(0.1, Math.min(2.0, this.flightSpeed));
+    
     }
     
     // ========== 复制 ==========

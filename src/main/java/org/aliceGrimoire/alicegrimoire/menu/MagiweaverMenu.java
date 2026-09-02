@@ -180,6 +180,7 @@ public class MagiweaverMenu extends AbstractContainerMenu {
     public void removed(Player player) {
         super.removed(player);
         this.clearContainer(player, centerContainer);
+        this.clearContainer(player, componentContainer);
     }
 
     @Override

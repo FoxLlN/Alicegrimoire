@@ -35,11 +35,12 @@ public class DollMoveControl extends MoveControl {
                 // 计算速度向量，确保不超过设定速度
                 double speed = this.speedModifier;
                 Vec3 direction = delta.normalize();
-                // 如果目标在方块内，稍微抬高避免卡墙
-                if (doll.level().getBlockState(doll.blockPosition()).isSolidRender(doll.level(), doll.blockPosition())) {
-                    // 卡墙，尝试向上脱困
-                    direction = direction.add(0, 1, 0).normalize();
-                }
+                // 如果目标在方块内，稍微抬高避免卡墙 
+                // 依赖 DollStateManager 中的 DollCollisionHelper.tryEscapeFromBlock() 统一处理。
+                //if (doll.level().getBlockState(doll.blockPosition()).isSolidRender(doll.level(), doll.blockPosition())) {
+                //    // 卡墙，尝试向上脱困
+                //    direction = direction.add(0, 1, 0).normalize();
+                //}
                 Vec3 velocity = direction.scale(Math.min(speed, distance));
                 doll.setDeltaMovement(velocity);
                 // 转向

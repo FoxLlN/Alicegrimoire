@@ -55,7 +55,7 @@ public class DollBatonInputHandler {
                 }
 
                 // 2. 如果没有精确点人偶，检查是否有吸附目标（用于攻击）
-                if (!shouldIntercept && DollBatonHandler.getCurrentTarget() != null) {
+                if (!shouldIntercept && DollBatonHandler.getCurrentTarget(player) != null) {
                     shouldIntercept = true;
                 }
 

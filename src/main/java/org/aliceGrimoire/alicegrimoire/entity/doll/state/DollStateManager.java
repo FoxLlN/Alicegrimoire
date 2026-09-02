@@ -189,6 +189,9 @@ public class DollStateManager {
      * 更新栓绳被阻挡的累计时间（用于颜色和自动解除激怒）
      */
     private void updateObstructedStatus() {
+        // 【性能优化】每 5 Tick 检测一次（颜色渐变依然平滑，人眼无感知）
+        if (doll.tickCount % 5 != 0) return;
+        
         LivingEntity owner = doll.getOwner();
         if (owner == null) {
             obstructedTicks = 0;

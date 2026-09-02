@@ -18,6 +18,11 @@ import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+
+import java.lang.ref.WeakReference;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * 指挥棒预选目标处理
@@ -30,13 +35,18 @@ public class DollBatonHandler {
     private static final double REACH = 16.0;
     private static final double FOV_THRESHOLD = 0.99;
 
-    private static LivingEntity currentTarget = null;
-    private static LivingEntity lastTarget = null;
+    // 使用 WeakHashMap，玩家下线后自动释放引用
+    // 值使用 WeakReference，目标实体死亡后自动释放
+    private static final Map<Player, WeakReference<LivingEntity>> currentTargets = new WeakHashMap<>();
+    private static final Map<Player, WeakReference<LivingEntity>> lastTargets = new WeakHashMap<>();
 
     @SubscribeEvent
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         Player player = event.getEntity();
         if (player.level().isClientSide()) return;
+
+        // 每2tick检测一次
+        if (player.level().getGameTime() % 2 != 0) return;
 
         ItemStack mainHand = player.getMainHandItem();
         ItemStack offHand = player.getOffhandItem();
@@ -44,42 +54,50 @@ public class DollBatonHandler {
                 offHand.getItem() instanceof DollBatonItem;
 
         if (!hasBaton) {
-            clearTargetGlow();
-            // Todo 动画
+            clearTargetGlow(player);
             return;
         }
 
-        // 查找目标
         LivingEntity target = raycastTarget(player);
+        LivingEntity lastTarget = getLastTarget(player);
 
         if (target != lastTarget) {
-            clearTargetGlow();
+            clearTargetGlow(player);
             if (target != null) {
                 target.addEffect(new MobEffectInstance(MobEffects.GLOWING, 200, 0, false, false));
-                currentTarget = target;
-                // Todo 动画
-            } else {
-                // Todo 动画
+                currentTargets.put(player, new WeakReference<>(target));
             }
-            lastTarget = target;
+            lastTargets.put(player, new WeakReference<>(target));
         }
 
-        if (currentTarget != null && !currentTarget.isAlive()) {
-            clearTargetGlow();
-            // Todo 动画
+        LivingEntity current = getCurrentTarget(player);
+        if (current != null && !current.isAlive()) {
+            clearTargetGlow(player);
         }
     }
 
-    public static LivingEntity getCurrentTarget() {
-        return currentTarget;
+    public static LivingEntity getCurrentTarget(Player player) {
+        WeakReference<LivingEntity> ref = currentTargets.get(player);
+        return ref != null ? ref.get() : null;
     }
 
-    public static void clearTargetGlow() {
-        if (currentTarget != null) {
-            currentTarget.removeEffect(MobEffects.GLOWING);
-            currentTarget = null;
+    private static LivingEntity getLastTarget(Player player) {
+        WeakReference<LivingEntity> ref = lastTargets.get(player);
+        return ref != null ? ref.get() : null;
+    }
+
+    public static void clearTargetGlow(Player player) {
+        LivingEntity current = getCurrentTarget(player);
+        if (current != null) {
+            current.removeEffect(MobEffects.GLOWING);
         }
-        lastTarget = null;
+        currentTargets.remove(player);
+        lastTargets.remove(player);
+    }
+
+    // 玩家登出时清理（由 ModEvents 调用）
+    public static void onPlayerLoggedOut(Player player) {
+        clearTargetGlow(player);
     }
 
     private static LivingEntity raycastTarget(Player player) {
@@ -92,8 +110,12 @@ public class DollBatonHandler {
                 player.getBoundingBox().inflate(REACH),
                 entity -> entity != player && entity.isAlive() && entity instanceof LivingEntity);
 
-        entities.sort(Comparator.comparingDouble(e -> e.distanceToSqr(player)));
-
+        double maxReachSq = REACH * REACH;
+        entities = entities.stream()
+            .filter(e -> e.distanceToSqr(player) <= maxReachSq)
+            .sorted(Comparator.comparingDouble(e -> e.distanceToSqr(player)))
+            .collect(Collectors.toList());
+        
         LivingEntity bestTarget = null;
         double bestDot = -1.0;
 
