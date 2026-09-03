@@ -4,8 +4,11 @@ import com.mojang.logging.LogUtils;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.entity.EntityAttributeCreationEvent;
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
+import org.aliceGrimoire.alicegrimoire.modifier.ModifierLoader;
 import org.aliceGrimoire.alicegrimoire.registry.*;
 import org.slf4j.Logger;
 
@@ -50,6 +53,16 @@ public class Alicegrimoire {
         modEventBus.addListener(org.aliceGrimoire.alicegrimoire.client.ClientEvents::registerRenderers);
         // 注册客户端屏幕事件监听器
         modEventBus.addListener(org.aliceGrimoire.alicegrimoire.client.ClientEvents::registerScreens);
+    
+        // ========== 关键修复：注册数据包加载器（游戏事件） ==========
+        // 使用 NeoForge.EVENT_BUS 监听 AddReloadListenerEvent
+        NeoForge.EVENT_BUS.addListener(this::onAddReloadListeners);
+    }
+
+    // 处理数据包加载监听器注册
+    private void onAddReloadListeners(AddReloadListenerEvent event) {
+        event.addListener(new ModifierLoader());
+        LOGGER.info("Registered ModifierLoader data pack listener.");
     }
 
     /**

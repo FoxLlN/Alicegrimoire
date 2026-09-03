@@ -134,6 +134,11 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
         super.tick();
 
         if (!this.level().isClientSide) {
+            // ===== 死亡后立即停止所有服务端逻辑 =====
+            if (!this.isAlive()) {
+                return;
+            }
+
             // 1. 更新拴住状态（检测护腿装备）
             LivingEntity owner = this.getOwner();
             if (owner instanceof Player player) {
@@ -280,31 +285,30 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
                 }
             }
             
-            // 拾取掉落物（每5 tick检测一次）
-            if (this.tickCount % 5 == 0) {
+            // 拾取掉落物（每3 tick检测一次）
+            if (this.tickCount % 3 == 0) {
                 double pickupRange = this.getDollData().getPickupRange();
                 List<ItemEntity> items = this.level().getEntitiesOfClass(
                     ItemEntity.class,
                     this.getBoundingBox().inflate(pickupRange),
                     item -> !item.hasPickUpDelay() && item.isAlive() && !item.getItem().isEmpty()
                 );
-                // 按距离排序，优先拾取最近的
                 items.sort(Comparator.comparingDouble(e -> e.distanceToSqr(this)));
+
                 for (ItemEntity itemEntity : items) {
                     if (tryPickupItem(itemEntity)) {
-                        break; // 一次只捡一个（与玩家行为一致，也可连续捡多个，但每5 tick足够）
+                        break; // 一次只捡一个，保持合理性能
                     }
+                    // 如果拾取失败（背包满无法装备），继续尝试下一个物品
                 }
             }
-
-        }
-
-        // 8. 人偶互相排斥
-        if (!this.level().isClientSide) {
-            applyRepulsion();
-        }
-        if (shieldDisableTicks > 0) {
-            shieldDisableTicks--;
+            // 8. 人偶互相排斥
+            if (!this.level().isClientSide) {
+                applyRepulsion();
+            }
+            if (shieldDisableTicks > 0) {
+                shieldDisableTicks--;
+            }
         }
     }
 
@@ -866,8 +870,6 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
 
         CompoundTag entityTag = new CompoundTag();
         this.saveWithoutId(entityTag);
-
-        // ===== 修复点：手动补全实体 ID =====
         entityTag.putString("id", EntityType.getKey(this.getType()).toString());
 
         // 确保破损标记
@@ -883,9 +885,16 @@ public class DollEntity extends PathfinderMob implements GeoEntity, OwnableEntit
 
         stack.set(DataComponents.ENTITY_DATA, CustomData.of(entityTag));
 
+        // ===== 同步保存职业和组件 =====
         DollJobType jobType = this.getJobType();
         if (jobType != null) {
             stack.set(ModDataComponents.DOLL_TYPE.get(), jobType);
+        }
+        List<ItemStack> comps = this.getDollData().getComponents();
+        if (comps != null && !comps.isEmpty()) {
+            stack.set(ModDataComponents.COMPONENTS.get(), comps);
+        } else {
+            stack.set(ModDataComponents.COMPONENTS.get(), List.of());
         }
 
         return stack;

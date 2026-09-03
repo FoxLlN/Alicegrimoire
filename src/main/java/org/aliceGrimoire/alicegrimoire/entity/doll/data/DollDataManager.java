@@ -4,6 +4,10 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.item.ItemStack;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import org.aliceGrimoire.alicegrimoire.entity.DollEntity;
 import org.aliceGrimoire.alicegrimoire.entity.doll.combat.ICombatStrategy;
 import org.aliceGrimoire.alicegrimoire.entity.doll.combat.strategy.*;
@@ -36,25 +40,29 @@ public class DollDataManager {
     
     // ========== 应用数据到实体 ==========
     public void applyDataToEntity() {
-        // 基础属性
+        // ----- 基础属性 -----
+        // 最大生命值（来自模板 + 改装）
         doll.getAttribute(Attributes.MAX_HEALTH)
             .setBaseValue(data.getMaxHealth());
         
-        // 攻击力：从武器动态计算
+        // 攻击力 = 基础攻击（模板+改装） + 武器加成
         float attackDamage = data.getWeaponAttackDamage();
         doll.getAttribute(Attributes.ATTACK_DAMAGE)
             .setBaseValue(attackDamage);
         
-        // 护甲：从装备的盔甲动态计算
-        int armor = data.getTotalArmor();
+        // 总护甲 = 基础护甲（模板+改装） + 盔甲护甲
+        int baseArmor = data.getArmor();
+        int armorFromEquipment = data.getTotalArmor();
         doll.getAttribute(Attributes.ARMOR)
-            .setBaseValue(armor);
+            .setBaseValue(baseArmor + armorFromEquipment);
         
-        // 护甲韧性：从装备的盔甲动态计算
-        float toughness = data.getTotalArmorToughness();
+        // 总护甲韧性 = 基础韧性（模板+改装） + 盔甲韧性
+        double baseToughness = data.getArmorToughness();
+        float toughnessFromEquipment = data.getTotalArmorToughness();
         doll.getAttribute(Attributes.ARMOR_TOUGHNESS)
-            .setBaseValue(toughness);
+            .setBaseValue(baseToughness + toughnessFromEquipment);
         
+        // 其他属性
         doll.getAttribute(Attributes.KNOCKBACK_RESISTANCE)
             .setBaseValue(data.getKnockbackResistance());
         doll.getAttribute(Attributes.FLYING_SPEED)
@@ -66,7 +74,7 @@ public class DollDataManager {
         }
     }
     
-    // ========== 策略工厂（核心） ==========
+    // ========== 策略工厂 ==========
     private ICombatStrategy createStrategy() {
         DollJobType job = data.getJobType();
         
@@ -79,11 +87,11 @@ public class DollDataManager {
             
             // === 守御AI（举盾保护） ===
             case DEFENDER -> new DefenderStrategy();
-            
-            // === 射手AI（远离+走位+射击） ===
-            case SHARPSHOOTER -> new SharpshooterStrategy();   
-            
-            // === 游击AI（一击脱离） ===
+
+            // === 狙击AI（远程攻击） ===
+            case SHARPSHOOTER -> new SharpshooterStrategy();
+
+            // === 游走AI（灵活移动） ===
             case VANGUARD -> new VanguardStrategy();
             
             default -> new MeleeStrategy();
@@ -98,45 +106,52 @@ public class DollDataManager {
         return currentStrategy;
     }
     
-    // ========== 职业切换 ==========
+    // ========== 职业切换（保留组件，仅更换模板） ==========
     public void setJobType(DollJobType newJob) {
-        DollDataTemplate template = DollDataTemplate.getTemplateForJob(newJob);
-        // 保留当前武器和颜色，仅更新职业相关属性
+        // 1. 保存当前状态（组件、武器、视觉等）
+        List<ItemStack> currentComponents = new ArrayList<>(data.getComponents());
         ItemStack currentWeapon = data.getWeapon();
+        ItemStack currentOffHand = data.getOffHand();
         int hairColor = data.getHairColor();
         int eyeColor = data.getEyeColor();
         int ribbonColor = data.getRibbonColor();
         boolean isBroken = data.isBroken();
+        boolean isTethered = data.isTethered();
         
-        data.applyTemplate(template);
+        // 2. 切换职业（这会清空 components 并重置所有属性）
+        data.setJobType(newJob); // DollData.setJobType 内部调用 recalculate()
+        
+        // 3. 恢复组件和状态（重新触发 recalculate）
+        data.setComponents(currentComponents);
         data.setWeapon(currentWeapon);
+        data.setOffHand(currentOffHand);
         data.setHairColor(hairColor);
         data.setEyeColor(eyeColor);
         data.setRibbonColor(ribbonColor);
         data.setBroken(isBroken);
+        data.setTethered(isTethered);
         
+        // 4. 应用到实体
         applyDataToEntity();
         refreshStrategy();
+        doll.syncEquipmentToClient();
     }
     
-    // ========== 属性修改器 ==========
-    public void addHealth(double amount) {
-        data.setMaxHealth(Math.max(1, data.getMaxHealth() + amount));
+    // ========== 组件管理（推荐的外部修改入口） ==========
+    public void setComponents(List<ItemStack> components) {
+        data.setComponents(components); // 内部触发 recalculate
         applyDataToEntity();
+        refreshStrategy(); // 如果组件包含武器，可能影响策略
+        doll.syncEquipmentToClient();
     }
     
-    public void addDamage(double amount) {
-        data.setDamage(Math.max(0, data.getDamage() + amount));
+    public void addComponent(ItemStack component) {
+        List<ItemStack> comps = new ArrayList<>(data.getComponents());
+        comps.add(component);
+        data.setComponents(comps);
         applyDataToEntity();
-    }
-    
-    public void addArmor(int amount) {
-        data.setArmor(Math.max(0, data.getArmor() + amount));
-        applyDataToEntity();
-    }
-    
-    public void addTetherRange(double amount) {
-        data.setTetherRange(Math.max(1, data.getTetherRange() + amount));
+        refreshStrategy();
+        doll.syncEquipmentToClient();
     }
 
     // ---------- 物品栏操作 ----------

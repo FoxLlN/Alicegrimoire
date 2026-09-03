@@ -36,4 +36,14 @@ public class ModItems {
 
     public static final DeferredItem<Item> BROKEN_DOLL = ITEMS.register("broken_doll", 
         () -> new BrokenDollItem(new Item.Properties().stacksTo(1)));
+
+    // 职业信物（不可堆叠）
+    public static final DeferredItem<Item> GUARD_CREST = ITEMS.register("guard_crest", 
+        () -> new Item(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<Item> DEFENDER_CREST = ITEMS.register("defender_crest", 
+        () -> new Item(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<Item> SHARPSHOOTER_CREST = ITEMS.register("sharpshooter_crest", 
+        () -> new Item(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<Item> VANGUARD_CREST = ITEMS.register("vanguard_crest", 
+        () -> new Item(new Item.Properties().stacksTo(1)));   
 }

@@ -69,7 +69,7 @@ public class MarkCleanupHandler {
      * @param event 服务器 tick 事件
      */
     @SubscribeEvent
-    public static void onServerTick(ServerTickEvent event) {
+    public static void onServerTick(ServerTickEvent.Post event) {
         var server = event.getServer();
         if (server == null) return;
 

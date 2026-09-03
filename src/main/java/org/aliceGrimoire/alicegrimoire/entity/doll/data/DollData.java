@@ -1,5 +1,10 @@
 package org.aliceGrimoire.alicegrimoire.entity.doll.data;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.aliceGrimoire.alicegrimoire.modifier.ModifierManager;
+
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
@@ -63,57 +68,86 @@ public class DollData {
     // ========== 战斗参数 ==========
     private CombatParameters combatParams = new CombatParameters();
     
+    // ========== 改装组件列表 ==========
+    private List<ItemStack> components = new ArrayList<>();
+
     // ========== 构造函数 ==========
     public DollData() {
         this(DollDataTemplate.DEFAULT);
     }
     
     public DollData(DollDataTemplate template) {
-        applyTemplate(template);
         // 初始化所有槽位为空
         for (int i = 0; i < inventory.length; i++) {
             inventory[i] = ItemStack.EMPTY;
         }
         this.customData = new CompoundTag();
+
+        applyTemplate(template);
     }
     
-    // ========== 模板应用 ==========
+    // ========== 模板应用（仅设置来源，不直接赋值战斗属性） ==========
     public void applyTemplate(DollDataTemplate template) {
-        this.maxHealth = template.maxHealth();
-        this.damage = template.damage();
-        this.armor = template.armor();
-        this.armorToughness = template.armorToughness();
+        // 保存职业类型（用于重算时获取模板）
+        this.jobType = template.jobType();
+        // 视觉属性
+        this.hairColor = template.hairColor();
+        this.eyeColor = template.eyeColor();
+        this.ribbonColor = template.ribbonColor();
+        // 非战斗属性（如击退抗性、速度乘数等，这些可能不被改装影响，但为了统一，也在这里设）
         this.knockbackResistance = template.knockbackResistance();
         this.wanderSpeed = template.wanderSpeed();
         this.followSpeedMultiplier = template.followSpeedMultiplier();
         this.strikeSpeedMultiplier = template.strikeSpeedMultiplier();
-        this.flightSpeed = template.flightSpeed();
         this.turnSpeed = template.turnSpeed();
-        this.tetherRange = template.tetherRange();
         this.enrageRange = template.enrageRange();
         this.dragStartRange = template.dragStartRange();
         this.dragForceRange = template.dragForceRange();
         this.occupiesSlot = template.occupiesSlot();
-        this.jobType = template.jobType();
         this.hasShield = template.hasShield();
-        this.hairColor = template.hairColor();
-        this.eyeColor = template.eyeColor();
-        this.ribbonColor = template.ribbonColor();
-        this.tethered = false;
-        this.isBroken = false;
-        // ===== 复制战斗参数 =====
+        // 战斗参数（CombatParameters）也由模板提供，并独立于改装
         this.combatParams = template.combatParams().copy();
+
+        // 战斗属性（maxHealth, damage, armor, etc）全部由 recalculate 计算
+        recalculate(); // 此时 components 可能为空，会使用模板默认值
+    }
+
+    // ========== 核心方法：全量重算战斗属性 ==========
+    public void recalculate() {
+        // 1. 根据当前职业获取模板的原始值
+        DollDataTemplate template = DollDataTemplate.getTemplateForJob(this.jobType);
+        double newHealth = template.maxHealth();
+        double newDamage = template.damage();
+        int newArmor = template.armor();
+        double newToughness = template.armorToughness();
+        double newFlightSpeed = template.flightSpeed();
+        double newTetherRange = template.tetherRange();
+
+        // 2. 应用所有组件的修正（堆叠数量影响效果）
+        for (ItemStack stack : components) {
+            if (stack.isEmpty()) continue;
+            newHealth += ModifierManager.getModifiedValue(stack, "max_health");
+            newDamage += ModifierManager.getModifiedValue(stack, "attack_damage");
+            newArmor += (int) ModifierManager.getModifiedValue(stack, "armor");
+            newToughness += ModifierManager.getModifiedValue(stack, "armor_toughness");
+            newFlightSpeed += ModifierManager.getModifiedValue(stack, "flight_speed");
+            newTetherRange += ModifierManager.getModifiedValue(stack, "tether_range");
+        }
+
+        // 3. 钳制并赋值（这就是唯一生效的当前值）
+        this.maxHealth = Math.max(1, Math.min(200.0, newHealth));
+        this.damage = Math.max(0, Math.min(50.0, newDamage));
+        this.armor = (int) Math.max(0, Math.min(30, newArmor));
+        this.armorToughness = Math.max(0, Math.min(10.0, newToughness));
+        this.flightSpeed = Math.max(0.1, Math.min(2.0, newFlightSpeed));
+        this.tetherRange = Math.max(1, Math.min(64.0, newTetherRange));
     }
     
     // ========== Getter / Setter ==========
     public double getMaxHealth() { return maxHealth; }
-    public void setMaxHealth(double maxHealth) { this.maxHealth = maxHealth; }
     public double getDamage() { return damage; }
-    public void setDamage(double damage) { this.damage = damage; }
     public int getArmor() { return armor; }
-    public void setArmor(int armor) { this.armor = armor; }
     public double getArmorToughness() { return armorToughness; }
-    public void setArmorToughness(double armorToughness) { this.armorToughness = armorToughness; }
     public double getKnockbackResistance() { return knockbackResistance; }
     
     public double getWanderSpeed() { return wanderSpeed; }
@@ -124,11 +158,9 @@ public class DollData {
     public void setStrikeSpeedMultiplier(double multiplier) { this.strikeSpeedMultiplier = multiplier; }
     
     public double getFlightSpeed() { return flightSpeed; }
-    public void setFlightSpeed(double speed) { this.flightSpeed = speed; }
     public double getTurnSpeed() { return turnSpeed; }
     
     public double getTetherRange() { return tetherRange; }
-    public void setTetherRange(double range) { this.tetherRange = range; }
     public double getEnrageRange() { return enrageRange; }
     public void setEnrageRange(double range) { this.enrageRange = range; }
     public double getDragStartRange() { return dragStartRange; }
@@ -140,7 +172,18 @@ public class DollData {
     public void setOccupiesSlot(boolean occupiesSlot) { this.occupiesSlot = occupiesSlot; }
 
     public DollJobType getJobType() { return jobType; }
-    public void setJobType(DollJobType jobType) { this.jobType = jobType; }
+    public void setJobType(DollJobType jobType) {
+        this.jobType = jobType;
+        recalculate();
+    }
+    
+    public void setComponents(List<ItemStack> components) {
+        this.components = components != null ? new ArrayList<>(components) : new ArrayList<>();
+        recalculate();
+    }
+    public List<ItemStack> getComponents() {
+        return components;
+    }
     
     public int getBackpackSlots() { return backpackSlots; }
     public void setBackpackSlots(int slots) { this.backpackSlots = Math.min(slots, DollSlots.MAX_BACKPACK_SLOTS); }
@@ -169,6 +212,10 @@ public class DollData {
 
     public ItemStack getOffHand() {
         return getItem(DollSlots.OFF_HAND);
+    }
+    
+    public void setOffHand(ItemStack stack) {
+        setItem(DollSlots.OFF_HAND, stack);
     }
 
     public WeaponType getWeaponType() {
@@ -201,25 +248,32 @@ public class DollData {
     // ========== NBT 持久化 ==========
     public CompoundTag save(HolderLookup.Provider registries) {
         CompoundTag tag = new CompoundTag();
-        tag.putDouble("MaxHealth", maxHealth);
-        tag.putDouble("Damage", damage);
-        tag.putInt("Armor", armor);
-        tag.putDouble("ArmorToughness", armorToughness);
+
+        // 保存职业类型（用于恢复时重新计算）
+        tag.putString("JobType", jobType.name());
+
+        // 保存组件列表（用于恢复时重新计算修正）
+        CompoundTag compTag = new CompoundTag();
+        for (int i = 0; i < components.size(); i++) {
+            if (!components.get(i).isEmpty()) {
+                compTag.put("Comp" + i, components.get(i).save(registries));
+            }
+        }
+        tag.put("Components", compTag);
+
+        // 保存非战斗属性（直接从字段读取）
         tag.putDouble("KnockbackResistance", knockbackResistance);
         tag.putDouble("WanderSpeed", wanderSpeed);
         tag.putDouble("FollowSpeedMultiplier", followSpeedMultiplier);
         tag.putDouble("StrikeSpeedMultiplier", strikeSpeedMultiplier);
-        tag.putDouble("FlightSpeed", flightSpeed);
         tag.putDouble("TurnSpeed", turnSpeed);
-        tag.putDouble("TetherRange", tetherRange);
         tag.putDouble("EnrageRange", enrageRange);
         tag.putDouble("DragStartRange", dragStartRange);
         tag.putDouble("DragForceRange", dragForceRange);
         tag.putBoolean("OccupiesSlot", occupiesSlot);
-        tag.putString("JobType", jobType.name());
-        tag.putBoolean("IsBroken", isBroken);
         tag.putBoolean("HasShield", hasShield);
         tag.putBoolean("Tethered", tethered);
+        tag.putBoolean("IsBroken", isBroken);
         tag.putInt("HairColor", hairColor);
         tag.putInt("EyeColor", eyeColor);
         tag.putInt("RibbonColor", ribbonColor);
@@ -236,90 +290,142 @@ public class DollData {
         }
         tag.put("Inventory", invTag);
 
-        // 保存战斗参数
+        // 保存战斗参数（独立于改装）
         tag.put("CombatParams", combatParams.save(registries));
 
         return tag;
     }
     
     public void load(CompoundTag tag, HolderLookup.Provider registries) {
-        this.maxHealth = tag.getDouble("MaxHealth");
-        this.damage = tag.getDouble("Damage");
-        this.armor = tag.getInt("Armor");
-        this.armorToughness = tag.getDouble("ArmorToughness");
+        // 加载职业类型（
+        if (tag.contains("JobType")) {
+            try {
+                this.jobType = DollJobType.valueOf(tag.getString("JobType"));
+            } catch (Exception e) {
+                this.jobType = DollJobType.STANDARD; // 容错：未知类型回退为标准
+            }
+        } else {
+            this.jobType = DollJobType.STANDARD; // 旧存档兼容
+        }
+
+        // 加载组件列表（recalculate 需要它来计算修正）
+        this.components.clear();
+        if (tag.contains("Components")) {
+            CompoundTag compTag = tag.getCompound("Components");
+            for (int i = 0; i < 8; i++) { // 最多 8 个组件（织魔台周围格子数）
+                if (compTag.contains("Comp" + i)) {
+                    ItemStack stack = ItemStack.parse(registries, compTag.getCompound("Comp" + i))
+                            .orElse(ItemStack.EMPTY);
+                    if (!stack.isEmpty()) {
+                        this.components.add(stack);
+                    }
+                }
+            }
+        }
+
+        // 加载非战斗属性
+        // 击退抗性
         this.knockbackResistance = tag.getDouble("KnockbackResistance");
+        // 速度属性（游荡/跟随/出击的乘数）
         this.wanderSpeed = tag.getDouble("WanderSpeed");
         this.followSpeedMultiplier = tag.getDouble("FollowSpeedMultiplier");
         this.strikeSpeedMultiplier = tag.getDouble("StrikeSpeedMultiplier");
-        this.flightSpeed = tag.getDouble("FlightSpeed");
+        // 转向速度
         this.turnSpeed = tag.getDouble("TurnSpeed");
-        this.tetherRange = tag.getDouble("TetherRange");
+        // 范围属性（激怒范围、拖拽范围等）
         this.enrageRange = tag.getDouble("EnrageRange");
         this.dragStartRange = tag.getDouble("DragStartRange");
         this.dragForceRange = tag.getDouble("DragForceRange");
+        // 名额控制
         this.occupiesSlot = tag.getBoolean("OccupiesSlot");
-        this.jobType = DollJobType.valueOf(tag.getString("JobType"));
+        // 持盾标志
+        this.hasShield = tag.getBoolean("HasShield");
+        // 状态标志
         this.tethered = tag.getBoolean("Tethered");
         this.isBroken = tag.getBoolean("IsBroken");
-        this.hasShield = tag.getBoolean("HasShield");
+        // 视觉属性
         this.hairColor = tag.getInt("HairColor");
         this.eyeColor = tag.getInt("EyeColor");
         this.ribbonColor = tag.getInt("RibbonColor");
-        this.customData = tag.getCompound("CustomData");
+        // 背包配置
         this.backpackSlots = tag.getInt("BackpackSlots");
         this.pickupRange = tag.getDouble("PickupRange");
 
-        // 加载物品栏
+        // 加载自定义数据（未来扩展）
+        this.customData = tag.getCompound("CustomData").copy();
+
+        // 加载物品栏（盔甲、武器、背包物品）
         if (tag.contains("Inventory")) {
             CompoundTag invTag = tag.getCompound("Inventory");
             for (int i = 0; i < inventory.length; i++) {
                 if (invTag.contains("Slot" + i)) {
                     inventory[i] = ItemStack.parse(registries, invTag.getCompound("Slot" + i))
                             .orElse(ItemStack.EMPTY);
+                } else {
+                    inventory[i] = ItemStack.EMPTY; // 确保未命中的槽位为空
                 }
+            }
+        } else {
+            // 旧存档兼容：如果没有 Inventory 字段，全部置空
+            for (int i = 0; i < inventory.length; i++) {
+                inventory[i] = ItemStack.EMPTY;
             }
         }
 
-        // 加载战斗参数
+        // 加载战斗参数（CombatParameters - 独立于改装之外）
         if (tag.contains("CombatParams")) {
             combatParams.load(tag.getCompound("CombatParams"), registries);
         }
 
-        // 【安全修复】钳制数值防止恶意溢出
-        this.maxHealth = Math.max(1, Math.min(200.0, this.maxHealth));
-        this.armor = Math.max(0, Math.min(30, this.armor));
-        this.damage = Math.max(0, Math.min(50.0, this.damage));
-        this.armorToughness = Math.max(0, Math.min(10.0, this.armorToughness));
-        this.followSpeedMultiplier = Math.max(0.5, Math.min(3.0, this.followSpeedMultiplier));
-        this.strikeSpeedMultiplier = Math.max(0.5, Math.min(3.0, this.strikeSpeedMultiplier));
-        this.wanderSpeed = Math.max(0.01, Math.min(1.0, this.wanderSpeed));
-        this.flightSpeed = Math.max(0.1, Math.min(2.0, this.flightSpeed));
-    
+        // 根据职业 + 组件重新计算所有战斗属性
+        recalculate();
+
+        // 确保数据在合理范围内（防御性编程）
+        this.backpackSlots = Math.max(0, Math.min(DollSlots.MAX_BACKPACK_SLOTS, this.backpackSlots));
+        this.pickupRange = Math.max(0.5, Math.min(8.0, this.pickupRange));
     }
     
     // ========== 复制 ==========
     public DollData copy() {
-        DollData copy = new DollData();
-        copy.applyTemplate(new DollDataTemplate(
-            maxHealth, damage, armor, armorToughness, knockbackResistance,
-            wanderSpeed, followSpeedMultiplier, strikeSpeedMultiplier,
-            flightSpeed, turnSpeed, 
-            tetherRange, enrageRange, dragStartRange, dragForceRange,
-            occupiesSlot,
-            jobType, hasShield,
-            hairColor, eyeColor, ribbonColor,
-            combatParams.copy() // 传递副本
-        ));
+        // 基于当前职业的纯净模板创建新对象
+        DollDataTemplate template = DollDataTemplate.getTemplateForJob(this.jobType);
+        DollData copy = new DollData(template);
+        
+        // 复制组件列表
+        copy.components = new ArrayList<>(this.components);
+        
+        // 复制非战斗属性（这些不受模板影响）
+        copy.knockbackResistance = this.knockbackResistance;
+        copy.wanderSpeed = this.wanderSpeed;
+        copy.followSpeedMultiplier = this.followSpeedMultiplier;
+        copy.strikeSpeedMultiplier = this.strikeSpeedMultiplier;
+        copy.turnSpeed = this.turnSpeed;
+        copy.enrageRange = this.enrageRange;
+        copy.dragStartRange = this.dragStartRange;
+        copy.dragForceRange = this.dragForceRange;
+        copy.occupiesSlot = this.occupiesSlot;
+        copy.hasShield = this.hasShield;
+        copy.tethered = this.tethered;
+        copy.isBroken = this.isBroken;
+        copy.hairColor = this.hairColor;
+        copy.eyeColor = this.eyeColor;
+        copy.ribbonColor = this.ribbonColor;
+        copy.backpackSlots = this.backpackSlots;
+        copy.pickupRange = this.pickupRange;
+        copy.customData = this.customData.copy();
+        
+        // 复制物品栏
         for (int i = 0; i < inventory.length; i++) {
             if (!inventory[i].isEmpty()) {
                 copy.inventory[i] = inventory[i].copy();
             }
         }
-        copy.backpackSlots = this.backpackSlots;
-        copy.pickupRange = this.pickupRange;
-        copy.isBroken = this.isBroken;
-        copy.customData = this.customData.copy();
-        copy.tethered = this.tethered;
+        
+        // 复制战斗参数
+        copy.combatParams = this.combatParams.copy();
+        
+        // 最后确保属性一致
+        copy.recalculate();
         return copy;
     }
 

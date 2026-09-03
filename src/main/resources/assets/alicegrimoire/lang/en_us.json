@@ -14,11 +14,12 @@
   "container.magiweaver": "Magiweaver",
 
   "doll_type.alicegrimoire.standard": "Standard Doll",
-  "doll_type.alicegrimoire.sword": "Sword Doll",
   "doll_type.alicegrimoire.guard": "Guard Doll",
-  "doll_type.alicegrimoire.pillager": "Pillager Doll",
-  "doll_type.alicegrimoire.lancer": "Lancer Doll",
+  "doll_type.alicegrimoire.defender": "Defender Doll",
   "doll_type.alicegrimoire.sharpshooter": "Sharpshooter Doll",
+  "doll_type.alicegrimoire.vanguard": "Vanguard Doll",
+
+  "label.alicegrimoire.will_become": "Will become: %s",
 
   "label.alicegrimoire.type": "Type: %s",
   "label.alicegrimoire.health": "HP: %d",

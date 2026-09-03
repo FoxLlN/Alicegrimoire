@@ -107,7 +107,7 @@ public class BrokenDollItem extends DollItem {
                     String jobType = dollDataTag.getString("JobType");
                     tooltipComponents.add(Component.translatable(
                         "tooltip.alicegrimoire.broken_doll.former_job",
-                        Component.translatable("doll_type.alicegrimoire." + jobType)
+                        Component.translatable("doll_type.alicegrimoire." + jobType.toLowerCase())
                     ));
                 }
                 if (dollDataTag.contains("MaxHealth")) {

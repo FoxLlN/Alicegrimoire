@@ -28,6 +28,7 @@ import software.bernie.geckolib.renderer.GeoItemRenderer;
 import software.bernie.geckolib.util.GeckoLibUtil;
 import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 public class DollItem extends BlockItem implements GeoItem {
@@ -96,6 +97,10 @@ public class DollItem extends BlockItem implements GeoItem {
                     CustomData entityData = itemstack.get(DataComponents.ENTITY_DATA);
                     if (entityData != null) {
                         doll.load(entityData.copyTag());
+                    }
+                    List<ItemStack> comps = itemstack.get(ModDataComponents.COMPONENTS.get());
+                    if (comps != null && !comps.isEmpty()) {
+                        doll.getDollData().setComponents(comps);
                     }
 
                     DollJobType type = itemstack.getOrDefault(ModDataComponents.DOLL_TYPE.get(), DollJobType.STANDARD);
